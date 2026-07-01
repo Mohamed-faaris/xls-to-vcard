@@ -127,7 +127,7 @@ export function buildVCard(
     const iso = toDate(v);
     if (/BIRTH|BDAY|DOB/.test(label) || label === "") {
       try {
-        card.addBirthday(iso);
+        card.addBirthday(iso as `${number}-${number}-${number}`);
       } catch {
         /* ignore */
       }

@@ -64,6 +64,7 @@ export interface MappingConfig {
   mode: "simple" | "advanced";
   // Name
   nameAssembly: NamePart[]; // FN
+  fullName: string | null; // auto-split into given/family
   givenName: string | null;
   familyName: string | null;
   additionalNames: string | null;

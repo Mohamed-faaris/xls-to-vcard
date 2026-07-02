@@ -11,6 +11,8 @@ import {
   Mail,
   Calendar,
   Link as LinkIcon,
+  MapPin,
+  Tag,
   User,
   Filter as FilterIcon,
   Sparkles,
@@ -170,6 +172,7 @@ function reducer(state: MappingConfig, action: Action): MappingConfig {
 const emptyCfg: MappingConfig = {
   mode: "simple",
   nameAssembly: [],
+  fullName: null,
   givenName: null,
   familyName: null,
   additionalNames: null,
@@ -980,6 +983,16 @@ function NameSection({
         <>
           <Separator />
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+            <Field label="Full name (auto-split)">
+              <ColSelect
+                value={cfg.fullName}
+                onChange={(v) => dispatch({ type: "patch", patch: { fullName: v } })}
+                columns={columns}
+              />
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                Splits on first space → given<em> </em>family when individual fields are empty
+              </p>
+            </Field>
             <Field label="Prefix (Mr., Dr.)">
               <ColSelect
                 value={cfg.honorificPrefix}
@@ -1623,8 +1636,7 @@ function ContactCard({
   cfg: MappingConfig;
   headerMap: Map<string, string>;
 }) {
-  // Very simple vcf parse for display
-  const lines = vcf.split(/\r?\n/);
+  const lines = vcf.split(/\r?\n/).filter(Boolean);
   const get = (key: string) => {
     const l = lines.find((l) => l.toUpperCase().startsWith(key + ":") || l.toUpperCase().startsWith(key + ";"));
     if (!l) return "";
@@ -1644,8 +1656,14 @@ function ContactCard({
   const fn = get("FN") || "(no name)";
   const org = get("ORG");
   const title = get("TITLE");
+  const role = get("ROLE");
   const phones = getAll("TEL");
   const emails = getAll("EMAIL");
+  const urls = getAll("URL");
+  const adrs = getAll("ADR");
+  const bday = get("BDAY");
+  const categories = get("CATEGORIES");
+  const note = get("NOTE");
   const initials = fn
     .split(/\s+/)
     .map((s) => s[0])
@@ -1657,15 +1675,26 @@ function ContactCard({
   const breakdown = nameBreakdown(row, cfg.nameAssembly, headerMap);
   const hasBreakdown = breakdown.length > 0;
 
+  function parseAdr(val: string) {
+    const parts = val.split(";");
+    const labels = ["", "", "street", "city", "region", "zip", "country"];
+    return parts
+      .map((p, i) => ({ label: labels[i], value: p }))
+      .filter((p) => p.label && p.value);
+  }
+
   return (
-    <div className="space-y-3">
-      <TooltipProvider delayDuration={200}>
+    <TooltipProvider delayDuration={200}>
+      <div className="space-y-3">
         <div className="flex items-center gap-3">
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex h-12 w-12 cursor-help items-center justify-center rounded-full bg-primary text-lg font-semibold text-primary-foreground">
+              <button
+                type="button"
+                className="flex h-12 w-12 cursor-help items-center justify-center rounded-full bg-primary text-lg font-semibold text-primary-foreground"
+              >
                 {initials || "?"}
-              </div>
+              </button>
             </TooltipTrigger>
             {hasBreakdown && (
               <TooltipContent side="top" className="max-w-64">
@@ -1673,39 +1702,76 @@ function ContactCard({
                 <div className="space-y-1">
                   {breakdown.map((b, i) => (
                     <div key={i} className="flex gap-2 text-[11px] leading-tight">
-                      <span className="shrink-0 text-primary-foreground/70">{b.label}</span>
-                      <span className="truncate text-primary-foreground">→ {b.value}</span>
+                      <span className="shrink-0 text-muted-foreground/70">{b.label}</span>
+                      <span className="truncate">→ {b.value}</span>
                     </div>
                   ))}
                 </div>
               </TooltipContent>
             )}
           </Tooltip>
-          <div>
-            <div className="font-medium">{fn}</div>
-            {(title || org) && (
-              <div className="text-xs text-muted-foreground">
-                {[title, org].filter(Boolean).join(" · ")}
+          <div className="min-w-0">
+            <div className="truncate font-medium">{fn}</div>
+            {(title || role || org) && (
+              <div className="truncate text-xs text-muted-foreground">
+                {[title, role, org].filter(Boolean).join(" · ")}
               </div>
             )}
           </div>
         </div>
-      </TooltipProvider>
-      {phones.length > 0 && (
-        <div className="space-y-1">
-          {phones.map((p, i) => (
-            <Row key={i} icon={<Phone className="h-3 w-3" />} label={p.label} value={p.value} />
-          ))}
-        </div>
-      )}
-      {emails.length > 0 && (
-        <div className="space-y-1">
-          {emails.map((e, i) => (
-            <Row key={i} icon={<Mail className="h-3 w-3" />} label={e.label} value={e.value} />
-          ))}
-        </div>
-      )}
-    </div>
+        {phones.length > 0 && (
+          <div className="space-y-1">
+            {phones.map((p, i) => (
+              <Row key={i} icon={<Phone className="h-3 w-3" />} label={p.label} value={p.value} />
+            ))}
+          </div>
+        )}
+        {emails.length > 0 && (
+          <div className="space-y-1">
+            {emails.map((e, i) => (
+              <Row key={i} icon={<Mail className="h-3 w-3" />} label={e.label} value={e.value} />
+            ))}
+          </div>
+        )}
+        {urls.length > 0 && (
+          <div className="space-y-1">
+            {urls.map((u, i) => (
+              <Row key={i} icon={<LinkIcon className="h-3 w-3" />} label={u.label} value={u.value} />
+            ))}
+          </div>
+        )}
+        {adrs.length > 0 && (
+          <div className="space-y-1">
+            {adrs.map((a, i) => {
+              const parts = parseAdr(a.value);
+              return (
+                <Row
+                  key={i}
+                  icon={<MapPin className="h-3 w-3" />}
+                  label={a.label}
+                  value={parts.map((p) => p.value).filter(Boolean).join(", ")}
+                />
+              );
+            })}
+          </div>
+        )}
+        {bday && (
+          <div className="space-y-1">
+            <Row icon={<Calendar className="h-3 w-3" />} label="" value={bday} />
+          </div>
+        )}
+        {categories && (
+          <div className="space-y-1">
+            <Row icon={<Tag className="h-3 w-3" />} label="" value={categories} />
+          </div>
+        )}
+        {note && (
+          <div className="rounded-md bg-muted/50 px-2 py-1">
+            <p className="text-xs text-muted-foreground">{note}</p>
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
 

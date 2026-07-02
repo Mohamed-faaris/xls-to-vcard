@@ -45,11 +45,25 @@ export function buildVCard(
 ): VCard {
   const card = new VCard();
 
-  const given = cell(row, cfg.givenName);
-  const family = cell(row, cfg.familyName);
+  let given = cell(row, cfg.givenName);
+  let family = cell(row, cfg.familyName);
   const middle = cell(row, cfg.additionalNames);
   const pre = cell(row, cfg.honorificPrefix);
   const suf = cell(row, cfg.honorificSuffix);
+
+  // Auto-split fullName column when individual fields are empty
+  if (!given && !family && cfg.fullName) {
+    const full = cell(row, cfg.fullName);
+    if (full) {
+      const space = full.indexOf(" ");
+      if (space > 0) {
+        given = full.slice(0, space).trim();
+        family = full.slice(space + 1).trim();
+      } else {
+        given = full;
+      }
+    }
+  }
 
   // FN must be set before addName() — addName auto-generates FN and will
   // skip it if FN is already set (checks hasProperty('FN') internally).

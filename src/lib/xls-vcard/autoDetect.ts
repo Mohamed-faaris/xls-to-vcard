@@ -76,6 +76,7 @@ export function autoDetect(cols: ColumnMeta[]): MappingConfig {
   return {
     mode: "simple",
     nameAssembly,
+    fullName: full?.key ?? null,
     givenName: given?.key ?? null,
     familyName: family?.key ?? null,
     additionalNames: middle?.key ?? null,

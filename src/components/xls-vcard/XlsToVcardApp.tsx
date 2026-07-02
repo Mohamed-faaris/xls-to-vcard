@@ -396,6 +396,16 @@ export function XlsToVcardApp() {
           />
         )}
       </main>
+      <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
+        <a
+          href="https://github.com/Mohamed-faaris/xls-to-vcard"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-foreground transition-colors"
+        >
+          Star on GitHub — fork, contribute, report issues
+        </a>
+      </footer>
     </div>
   );
 }
@@ -415,12 +425,9 @@ function Stepper({
   ];
   const idx = steps.findIndex((s) => s.id === step);
   return (
-    <div className="mx-auto flex max-w-7xl items-center gap-2 px-6 pb-4">
+    <nav className="mx-auto flex max-w-7xl items-center gap-2 px-6 pb-4" aria-label="Step navigation">
       {steps.map((s, i) => (
-        <div
-          key={s.id}
-          className="flex items-center gap-2"
-        >
+        <div key={s.id} className="flex items-center gap-2">
           <button
             type="button"
             disabled={i >= idx}
@@ -452,7 +459,7 @@ function Stepper({
           {i < steps.length - 1 && <div className="h-px w-8 bg-border" />}
         </div>
       ))}
-    </div>
+    </nav>
   );
 }
 

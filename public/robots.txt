@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://xls-to-vcard-magic.vercel.app/sitemap.xml

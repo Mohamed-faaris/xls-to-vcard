@@ -324,7 +324,7 @@ export function XlsToVcardApp() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <FileSpreadsheet className="h-4 w-4" />
@@ -345,7 +345,7 @@ export function XlsToVcardApp() {
         <Stepper step={step} onNavigate={handleStepNav} />
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8">
         {error && (
           <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
             {error}
@@ -425,15 +425,15 @@ function Stepper({
   ];
   const idx = steps.findIndex((s) => s.id === step);
   return (
-    <nav className="mx-auto flex max-w-7xl items-center gap-2 px-6 pb-4" aria-label="Step navigation">
+    <nav className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-6 pb-4" aria-label="Step navigation">
       {steps.map((s, i) => (
-        <div key={s.id} className="flex items-center gap-2">
+        <div key={s.id} className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
             disabled={i >= idx}
             onClick={() => onNavigate(s.id)}
             className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors",
+              "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors shrink-0",
               i <= idx
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground",
@@ -447,7 +447,7 @@ function Stepper({
             disabled={i >= idx}
             onClick={() => onNavigate(s.id)}
             className={cn(
-              "text-xs transition-colors",
+              "text-xs transition-colors whitespace-nowrap",
               i === idx
                 ? "font-medium text-foreground"
                 : "text-muted-foreground",
@@ -456,7 +456,7 @@ function Stepper({
           >
             {s.label}
           </button>
-          {i < steps.length - 1 && <div className="h-px w-8 bg-border" />}
+          {i < steps.length - 1 && <div className="h-px w-4 sm:w-8 bg-border shrink-0" />}
         </div>
       ))}
     </nav>
@@ -479,8 +479,8 @@ function DropStep({ onFile }: { onFile: (f: File) => void }) {
           const f = e.dataTransfer.files?.[0];
           if (f) onFile(f);
         }}
-        className={cn(
-          "flex w-full max-w-2xl cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-20 transition-colors",
+          className={cn(
+            "flex w-full max-w-2xl cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 sm:px-6 py-16 sm:py-20 transition-colors",
           drag
             ? "border-primary bg-primary/5"
             : "border-border hover:border-primary/50 hover:bg-muted/30"
@@ -541,7 +541,7 @@ function PreviewStep(props: {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-border bg-card p-4">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           <div>
             <Label className="text-xs">Sheet</Label>
             <Select value={sheetName} onValueChange={setSheetName}>
@@ -602,8 +602,8 @@ function PreviewStep(props: {
             ? `${filteredRows.length} of ${parsed?.rows.length ?? 0} rows`
             : `Preview — ${parsed?.rows.length ?? 0} data rows detected`}
         </div>
-        <div className="max-h-96 overflow-auto">
-          <table className="w-full text-sm">
+        <div className="max-h-96 overflow-x-auto">
+          <table className="w-full text-sm min-w-[500px]">
             <thead className="sticky top-0 bg-muted">
               <tr>
                 {parsed?.columns.map((c) => (
@@ -973,7 +973,7 @@ function NameSection({
       {cfg.mode === "advanced" && (
         <>
           <Separator />
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
             <Field label="Prefix (Mr., Dr.)">
               <ColSelect
                 value={cfg.honorificPrefix}
@@ -1057,8 +1057,8 @@ function MultiSection({
       )}
       {entries.map((e) => (
         <div key={e.id} className="rounded-md border border-border bg-muted/30 p-3">
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-[140px] flex-1">
               <ColSelect
                 value={e.columnKey}
                 onChange={(v) =>
@@ -1069,7 +1069,7 @@ function MultiSection({
             </div>
             {group !== "urls" && (
               <Input
-                className="h-8 w-28 text-sm"
+                className="h-8 w-full sm:w-28 text-sm"
                 placeholder="Label"
                 value={e.customLabel}
                 onChange={(ev) =>
@@ -1085,14 +1085,14 @@ function MultiSection({
             <Button
               size="icon"
               variant="ghost"
-              className="h-8 w-8"
+              className="h-8 w-8 shrink-0"
               onClick={() => dispatch({ type: "multi-remove", group, id: e.id })}
             >
               <Trash2 className="h-3 w-3" />
             </Button>
           </div>
           {advanced && group !== "urls" && (
-            <div className="mt-2 grid gap-2 md:grid-cols-2">
+            <div className="mt-2 grid gap-2 grid-cols-1 sm:grid-cols-2">
               <div>
                 <Label className="text-xs">Label from</Label>
                 <Select
@@ -1152,7 +1152,7 @@ function OrgSection({
 }) {
   return (
     <Section title="Organization">
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
         <Field label="Company">
           <ColSelect
             value={cfg.company}
@@ -1209,7 +1209,7 @@ function AddressSection({
       )}
       {cfg.addresses.map((a) => (
         <div key={a.id} className="rounded-md border border-border bg-muted/30 p-3">
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
             <Field label="Street">
               <ColSelect
                 value={a.street}
@@ -1272,7 +1272,7 @@ function MiscSection({
 }) {
   return (
     <Section title="Notes & Categories">
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
         <Field label="Categories (comma or semicolon separated)">
           <ColSelect
             value={cfg.categories}
@@ -1316,7 +1316,7 @@ function CustomPropsSection({
         </p>
       )}
       {cfg.customProps.map((cp) => (
-        <div key={cp.id} className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 md:grid-cols-4">
+        <div key={cp.id} className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 grid-cols-2 sm:grid-cols-4">
           <Field label="Property name">
             <Input
               className="h-8 text-sm"
@@ -1378,7 +1378,7 @@ function ExtraConstantsSection({
         </p>
       )}
       {cfg.extraConstants.map((ex) => (
-        <div key={ex.id} className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 md:grid-cols-4">
+        <div key={ex.id} className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 grid-cols-2 sm:grid-cols-4">
           <Field label="Target">
             <Select
               value={ex.target}
@@ -1474,8 +1474,8 @@ function FilterSection({
         </p>
       )}
       {filters.map((f) => (
-        <div key={f.id} className="flex items-center gap-2">
-          <div className="flex-1">
+        <div key={f.id} className="flex flex-wrap items-center gap-2">
+          <div className="min-w-[120px] flex-1 sm:flex-none sm:min-w-0 sm:w-36">
             <ColSelect
               value={f.columnKey}
               onChange={(v) => upd(f.id, { columnKey: v ?? "" })}
@@ -1483,7 +1483,7 @@ function FilterSection({
             />
           </div>
           <Select value={f.op} onValueChange={(v) => upd(f.id, { op: v as FilterRow["op"] })}>
-            <SelectTrigger className="h-8 w-40 text-sm">
+            <SelectTrigger className="h-8 w-36 sm:w-40 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1499,13 +1499,13 @@ function FilterSection({
           </Select>
           {f.op !== "blank" && f.op !== "not-blank" && (
             <Input
-              className="h-8 w-40 text-sm"
+              className="h-8 w-full sm:w-40 text-sm"
               value={f.value}
               onChange={(e) => upd(f.id, { value: e.target.value })}
               placeholder="value"
             />
           )}
-          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => rm(f.id)}>
+          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => rm(f.id)}>
             <Trash2 className="h-3 w-3" />
           </Button>
         </div>
@@ -1573,7 +1573,7 @@ function LivePreview({
             )}
           </TabsContent>
           <TabsContent value="raw" className="p-4">
-            <pre className="max-h-[500px] overflow-auto rounded-md bg-muted p-3 font-mono text-xs">
+            <pre className="max-h-[300px] sm:max-h-[500px] overflow-auto rounded-md bg-muted p-3 font-mono text-xs">
               {vcfText || "—"}
             </pre>
           </TabsContent>

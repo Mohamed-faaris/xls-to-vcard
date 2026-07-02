@@ -45,8 +45,8 @@ export function buildVCard(
 ): VCard {
   const card = new VCard();
 
-  let given = cell(row, cfg.givenName);
-  let family = cell(row, cfg.familyName);
+  let given = cfg.firstNameAssembly.length > 0 ? assemble(row, cfg.firstNameAssembly) : cell(row, cfg.givenName);
+  let family = cfg.lastNameAssembly.length > 0 ? assemble(row, cfg.lastNameAssembly) : cell(row, cfg.familyName);
   const middle = cell(row, cfg.additionalNames);
   const pre = cell(row, cfg.honorificPrefix);
   const suf = cell(row, cfg.honorificSuffix);
@@ -65,7 +65,7 @@ export function buildVCard(
     }
   }
 
-  // FN is first + last name, skip auto-assembly
+  // FN is first + last name
   const fn = [given, family].filter(Boolean).join(" ");
   if (fn) card.addFullName(fn);
   else if (!given && !family) {

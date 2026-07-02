@@ -63,7 +63,9 @@ export interface ExtraConstantField {
 export interface MappingConfig {
   mode: "simple" | "advanced";
   // Name
-  nameAssembly: NamePart[]; // FN
+  nameAssembly: NamePart[]; // FN (backward compat)
+  firstNameAssembly: NamePart[]; // given name from parts
+  lastNameAssembly: NamePart[]; // family name from parts
   fullName: string | null; // auto-split into given/family
   givenName: string | null;
   familyName: string | null;

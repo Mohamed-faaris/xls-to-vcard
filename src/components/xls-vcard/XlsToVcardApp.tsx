@@ -17,6 +17,7 @@ import {
   Filter as FilterIcon,
   Sparkles,
   Settings2,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,8 @@ type Action =
       patch: Partial<MultiFieldEntry>;
     }
   | { type: "name-set"; parts: NamePart[] }
+  | { type: "firstName-set"; parts: NamePart[] }
+  | { type: "lastName-set"; parts: NamePart[] }
   | { type: "addr-add" }
   | { type: "addr-remove"; id: string }
   | { type: "addr-update"; id: string; patch: Partial<AddressEntry> }
@@ -97,6 +100,10 @@ function reducer(state: MappingConfig, action: Action): MappingConfig {
       };
     case "name-set":
       return { ...state, nameAssembly: action.parts };
+    case "firstName-set":
+      return { ...state, firstNameAssembly: action.parts };
+    case "lastName-set":
+      return { ...state, lastNameAssembly: action.parts };
     case "addr-add":
       return {
         ...state,
@@ -165,6 +172,8 @@ function reducer(state: MappingConfig, action: Action): MappingConfig {
 const emptyCfg: MappingConfig = {
   mode: "simple",
   nameAssembly: [],
+  firstNameAssembly: [],
+  lastNameAssembly: [],
   fullName: null,
   givenName: null,
   familyName: null,
@@ -865,6 +874,93 @@ function ColSelect({
   );
 }
 
+function NameAssembler({
+  label,
+  parts,
+  columns,
+  onParts,
+}: {
+  label: string;
+  parts: NamePart[];
+  columns: ColumnMeta[];
+  onParts: (parts: NamePart[]) => void;
+}) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+
+  const updatePart = (i: number, patch: Partial<NamePart>) => {
+    onParts(parts.map((p, idx) => (idx === i ? ({ ...p, ...patch } as NamePart) : p)));
+  };
+  const removePart = (i: number) => {
+    onParts(parts.filter((_, idx) => idx !== i));
+  };
+  const movePart = (from: number, to: number) => {
+    const next = [...parts];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onParts(next);
+  };
+  const addPart = (kind: "col" | "const") => {
+    const p: NamePart =
+      kind === "col"
+        ? { kind: "col", columnKey: columns[0]?.key ?? "" }
+        : { kind: "const", value: " " };
+    onParts([...parts, p]);
+  };
+
+  return (
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <p className="mb-1.5 text-[10px] text-muted-foreground">
+        Add columns and constant text in order.
+      </p>
+      <div className="space-y-1.5">
+        {parts.map((p, i) => (
+          <div
+            key={i}
+            draggable
+            onDragStart={() => setDragIdx(i)}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.opacity = "0.5"; }}
+            onDragLeave={(e) => { e.currentTarget.style.opacity = ""; }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.currentTarget.style.opacity = "";
+              if (dragIdx !== null && dragIdx !== i) movePart(dragIdx, i);
+              setDragIdx(null);
+            }}
+            onDragEnd={() => setDragIdx(null)}
+            className={cn("flex items-center gap-1.5", dragIdx === i && "opacity-40")}
+          >
+            <div className="cursor-grab text-muted-foreground">
+              <GripVertical className="h-3.5 w-3.5" />
+            </div>
+            <Badge variant="outline" className="text-[10px] shrink-0">
+              {p.kind === "col" ? "Col" : "Text"}
+            </Badge>
+            {p.kind === "col" ? (
+              <div className="flex-1 min-w-0">
+                <ColSelect value={p.columnKey} onChange={(v) => updatePart(i, { columnKey: v ?? "" })} columns={columns} />
+              </div>
+            ) : (
+              <Input className="h-7 flex-1 text-sm" value={p.value} onChange={(e) => updatePart(i, { value: e.target.value })} placeholder="text" />
+            )}
+            <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => removePart(i)}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        ))}
+        <div className="flex gap-1.5">
+          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => addPart("col")}>
+            <Plus className="h-3 w-3" /> Column
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => addPart("const")}>
+            <Plus className="h-3 w-3" /> Text
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NameSection({
   cfg,
   dispatch,
@@ -876,60 +972,26 @@ function NameSection({
 }) {
   return (
     <Section title="Name" icon={<User className="h-4 w-4" />}>
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+        <NameAssembler label="First name" parts={cfg.firstNameAssembly} columns={columns} onParts={(p) => dispatch({ type: "firstName-set", parts: p })} />
+        <NameAssembler label="Last name" parts={cfg.lastNameAssembly} columns={columns} onParts={(p) => dispatch({ type: "lastName-set", parts: p })} />
+      </div>
+      <Separator />
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-        <Field label="First name">
-          <ColSelect
-            value={cfg.givenName}
-            onChange={(v) => dispatch({ type: "patch", patch: { givenName: v } })}
-            columns={columns}
-          />
+        <Field label="Full name (auto-split)">
+          <ColSelect value={cfg.fullName} onChange={(v) => dispatch({ type: "patch", patch: { fullName: v } })} columns={columns} />
+          <p className="mt-0.5 text-[10px] text-muted-foreground">Splits on first space when assemblers above are empty</p>
         </Field>
-        <Field label="Last name">
-          <ColSelect
-            value={cfg.familyName}
-            onChange={(v) => dispatch({ type: "patch", patch: { familyName: v } })}
-            columns={columns}
-          />
+        <Field label="Prefix (Mr., Dr.)">
+          <ColSelect value={cfg.honorificPrefix} onChange={(v) => dispatch({ type: "patch", patch: { honorificPrefix: v } })} columns={columns} />
+        </Field>
+        <Field label="Middle name(s)">
+          <ColSelect value={cfg.additionalNames} onChange={(v) => dispatch({ type: "patch", patch: { additionalNames: v } })} columns={columns} />
+        </Field>
+        <Field label="Suffix (Jr., PhD)">
+          <ColSelect value={cfg.honorificSuffix} onChange={(v) => dispatch({ type: "patch", patch: { honorificSuffix: v } })} columns={columns} />
         </Field>
       </div>
-      {cfg.mode === "advanced" && (
-        <>
-          <Separator />
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-            <Field label="Full name (auto-split)">
-              <ColSelect
-                value={cfg.fullName}
-                onChange={(v) => dispatch({ type: "patch", patch: { fullName: v } })}
-                columns={columns}
-              />
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                Splits on first space → given + family when individual fields are empty
-              </p>
-            </Field>
-            <Field label="Prefix (Mr., Dr.)">
-              <ColSelect
-                value={cfg.honorificPrefix}
-                onChange={(v) => dispatch({ type: "patch", patch: { honorificPrefix: v } })}
-                columns={columns}
-              />
-            </Field>
-            <Field label="Middle name(s)">
-              <ColSelect
-                value={cfg.additionalNames}
-                onChange={(v) => dispatch({ type: "patch", patch: { additionalNames: v } })}
-                columns={columns}
-              />
-            </Field>
-            <Field label="Suffix (Jr., PhD)">
-              <ColSelect
-                value={cfg.honorificSuffix}
-                onChange={(v) => dispatch({ type: "patch", patch: { honorificSuffix: v } })}
-                columns={columns}
-              />
-            </Field>
-          </div>
-        </>
-      )}
     </Section>
   );
 }

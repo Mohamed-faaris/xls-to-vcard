@@ -58,15 +58,18 @@ export function autoDetect(cols: ColumnMeta[]): MappingConfig {
   const categories = findCol(cols, [/categor|tag|group/]);
   const note = findCol(cols, [/note|comment|remark/]);
 
-  const nameAssembly: MappingConfig["nameAssembly"] = [
-    ...(given ? [{ kind: "col" as const, columnKey: given.key }] : []),
-    ...(given && family ? [{ kind: "const" as const, value: " " }] : []),
-    ...(family ? [{ kind: "col" as const, columnKey: family.key }] : []),
-  ];
+  const firstNameAssembly: MappingConfig["firstNameAssembly"] = given
+    ? [{ kind: "col" as const, columnKey: given.key }]
+    : [];
+  const lastNameAssembly: MappingConfig["lastNameAssembly"] = family
+    ? [{ kind: "col" as const, columnKey: family.key }]
+    : [];
 
   return {
     mode: "simple",
-    nameAssembly,
+    nameAssembly: [],
+    firstNameAssembly,
+    lastNameAssembly,
     fullName: full?.key ?? null,
     givenName: given?.key ?? null,
     familyName: family?.key ?? null,

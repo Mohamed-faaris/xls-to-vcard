@@ -15,6 +15,7 @@ import {
   Filter as FilterIcon,
   Sparkles,
   Settings2,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -195,6 +196,55 @@ export function XlsToVcardApp() {
   const [filters, setFilters] = useState<FilterRow[]>([]);
   const [previewRowIdx, setPreviewRowIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState("contacts");
+
+  // ── Session persistence ──────────────────────────────────────────
+  const STORAGE_KEY = "xls-vcard-session";
+
+  const saveSession = useCallback(() => {
+    if (step === "drop" || !parsed) return;
+    try {
+      const data = {
+        step,
+        sheetName,
+        skipRows,
+        firstRowIsHeader,
+        cfg,
+        filters,
+        previewRowIdx,
+        fileName,
+        columns: parsed.columns,
+        rows: parsed.rows,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch { /* quota exceeded or private mode */ }
+  }, [step, sheetName, skipRows, firstRowIsHeader, cfg, filters, previewRowIdx, fileName, parsed]);
+
+  // Debounced save
+  useEffect(() => {
+    const timer = setTimeout(saveSession, 500);
+    return () => clearTimeout(timer);
+  }, [saveSession]);
+
+  // Restore on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      setStep(saved.step);
+      setSheetName(saved.sheetName ?? "");
+      setSkipRows(saved.skipRows ?? 0);
+      setFirstRowIsHeader(saved.firstRowIsHeader ?? true);
+      setPreviewRowIdx(saved.previewRowIdx ?? 0);
+      setFilters(saved.filters ?? []);
+      setFileName(saved.fileName ?? "contacts");
+      dispatch({ type: "set", cfg: saved.cfg ?? emptyCfg });
+      if (saved.columns && saved.rows) {
+        setParsed({ columns: saved.columns, rows: saved.rows });
+      }
+    } catch { /* ignore corrupt data */ }
+  }, []);
 
   const handleFile = useCallback(async (f: File) => {
     setError(null);
@@ -206,6 +256,7 @@ export function XlsToVcardApp() {
       setSkipRows(0);
       setFirstRowIsHeader(true);
       setStep("preview");
+      setFileName(f.name.replace(/\.[^.]+$/, "") || "contacts");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -245,7 +296,17 @@ export function XlsToVcardApp() {
     setParsed(null);
     setSheetName("");
     setFilters([]);
+    setFileName("contacts");
     dispatch({ type: "set", cfg: emptyCfg });
+    localStorage.removeItem("xls-vcard-session");
+  };
+
+  const handleStepNav = (target: Step) => {
+    if (target === "drop") {
+      reset();
+    } else if (target === "preview" && (step === "map" || step === "export")) {
+      setStep("preview");
+    }
   };
 
   const download = () => {
@@ -255,7 +316,7 @@ export function XlsToVcardApp() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = (file?.name.replace(/\.[^.]+$/, "") || "contacts") + ".vcf";
+    a.download = (fileName || "contacts") + ".vcf";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -281,7 +342,7 @@ export function XlsToVcardApp() {
             </Button>
           )}
         </div>
-        <Stepper step={step} />
+        <Stepper step={step} onNavigate={handleStepNav} />
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
@@ -324,6 +385,8 @@ export function XlsToVcardApp() {
         {step === "export" && parsed && (
           <ExportStep
             count={filteredRows.length}
+            fileName={fileName}
+            onFileNameChange={setFileName}
             onBack={() => setStep("map")}
             onDownload={download}
             onReset={reset}
@@ -334,7 +397,13 @@ export function XlsToVcardApp() {
   );
 }
 
-function Stepper({ step }: { step: Step }) {
+function Stepper({
+  step,
+  onNavigate,
+}: {
+  step: Step;
+  onNavigate: (s: Step) => void;
+}) {
   const steps: { id: Step; label: string }[] = [
     { id: "drop", label: "Upload" },
     { id: "preview", label: "Preview" },
@@ -345,25 +414,38 @@ function Stepper({ step }: { step: Step }) {
   return (
     <div className="mx-auto flex max-w-7xl items-center gap-2 px-6 pb-4">
       {steps.map((s, i) => (
-        <div key={s.id} className="flex items-center gap-2">
-          <div
+        <div
+          key={s.id}
+          className="flex items-center gap-2"
+        >
+          <button
+            type="button"
+            disabled={i >= idx}
+            onClick={() => onNavigate(s.id)}
             className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
+              "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors",
               i <= idx
                 ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
+                : "bg-muted text-muted-foreground",
+              i < idx && "cursor-pointer hover:opacity-80"
             )}
           >
             {i + 1}
-          </div>
-          <span
+          </button>
+          <button
+            type="button"
+            disabled={i >= idx}
+            onClick={() => onNavigate(s.id)}
             className={cn(
-              "text-xs",
-              i === idx ? "font-medium text-foreground" : "text-muted-foreground"
+              "text-xs transition-colors",
+              i === idx
+                ? "font-medium text-foreground"
+                : "text-muted-foreground",
+              i < idx && "cursor-pointer hover:text-foreground"
             )}
           >
             {s.label}
-          </span>
+          </button>
           {i < steps.length - 1 && <div className="h-px w-8 bg-border" />}
         </div>
       ))}
@@ -580,7 +662,7 @@ function MapStep(props: {
             <span className="text-sm font-medium">
               {cfg.mode === "simple" ? "Simple mode" : "Advanced mode"}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground hidden sm:inline">
               {cfg.mode === "simple"
                 ? "Auto-detected mapping — quick tweaks"
                 : "Full control over every field"}
@@ -762,6 +844,8 @@ function NameSection({
   dispatch: React.Dispatch<Action>;
   columns: ColumnMeta[];
 }) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+
   const updatePart = (i: number, patch: Partial<NamePart>) => {
     const parts = cfg.nameAssembly.map((p, idx) =>
       idx === i ? ({ ...p, ...patch } as NamePart) : p
@@ -770,6 +854,12 @@ function NameSection({
   };
   const removePart = (i: number) => {
     dispatch({ type: "name-set", parts: cfg.nameAssembly.filter((_, idx) => idx !== i) });
+  };
+  const movePart = (from: number, to: number) => {
+    const parts = [...cfg.nameAssembly];
+    const [moved] = parts.splice(from, 1);
+    parts.splice(to, 0, moved);
+    dispatch({ type: "name-set", parts });
   };
   const addPart = (kind: "col" | "const") => {
     const p: NamePart =
@@ -787,12 +877,37 @@ function NameSection({
         </p>
         <div className="space-y-2">
           {cfg.nameAssembly.map((p, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
+            <div
+              key={i}
+              draggable
+              onDragStart={() => setDragIdx(i)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.currentTarget.style.opacity = "0.5";
+              }}
+              onDragLeave={(e) => {
+                e.currentTarget.style.opacity = "";
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.style.opacity = "";
+                if (dragIdx !== null && dragIdx !== i) movePart(dragIdx, i);
+                setDragIdx(null);
+              }}
+              onDragEnd={() => setDragIdx(null)}
+              className={cn(
+                "flex items-center gap-2",
+                dragIdx === i && "opacity-40"
+              )}
+            >
+              <div className="cursor-grab text-muted-foreground">
+                <GripVertical className="h-4 w-4" />
+              </div>
+              <Badge variant="outline" className="text-xs shrink-0">
                 {p.kind === "col" ? "Col" : "Text"}
               </Badge>
               {p.kind === "col" ? (
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <ColSelect
                     value={p.columnKey}
                     onChange={(v) => updatePart(i, { columnKey: v ?? "" })}
@@ -810,7 +925,7 @@ function NameSection({
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8"
+                className="h-8 w-8 shrink-0"
                 onClick={() => removePart(i)}
               >
                 <Trash2 className="h-3 w-3" />
@@ -1521,15 +1636,20 @@ function Row({ icon, label, value }: { icon: React.ReactNode; label: string; val
 
 function ExportStep({
   count,
+  fileName,
+  onFileNameChange,
   onBack,
   onDownload,
   onReset,
 }: {
   count: number;
+  fileName: string;
+  onFileNameChange: (v: string) => void;
   onBack: () => void;
   onDownload: () => void;
   onReset: () => void;
 }) {
+  const ext = ".vcf";
   return (
     <div className="flex flex-col items-center py-16">
       <div className="w-full max-w-md rounded-lg border border-border bg-card p-8 text-center">
@@ -1540,8 +1660,21 @@ function ExportStep({
         <p className="mt-1 text-sm text-muted-foreground">
           {count} contact{count === 1 ? "" : "s"} in a single .vcf file
         </p>
-        <Button className="mt-6 w-full" onClick={onDownload}>
-          <Download className="h-4 w-4" /> Download contacts.vcf
+        <div className="mt-4 text-left">
+          <Label className="text-xs">File name</Label>
+          <div className="mt-1 flex items-center gap-0">
+            <Input
+              className="h-9 flex-1 rounded-r-none text-sm"
+              value={fileName}
+              onChange={(e) => onFileNameChange(e.target.value)}
+            />
+            <div className="flex h-9 items-center rounded-md rounded-l-none border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+              {ext}
+            </div>
+          </div>
+        </div>
+        <Button className="mt-4 w-full" onClick={onDownload}>
+          <Download className="h-4 w-4" /> Download{fileName ? ` ${fileName}${ext}` : ""}
         </Button>
         <div className="mt-3 flex gap-2">
           <Button variant="outline" className="flex-1" onClick={onBack}>

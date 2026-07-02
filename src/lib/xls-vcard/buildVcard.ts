@@ -45,12 +45,21 @@ export function buildVCard(
 ): VCard {
   const card = new VCard();
 
-  // Structured name
   const given = cell(row, cfg.givenName);
   const family = cell(row, cfg.familyName);
   const middle = cell(row, cfg.additionalNames);
   const pre = cell(row, cfg.honorificPrefix);
   const suf = cell(row, cfg.honorificSuffix);
+
+  // FN must be set before addName() — addName auto-generates FN and will
+  // skip it if FN is already set (checks hasProperty('FN') internally).
+  const fn = assemble(row, cfg.nameAssembly);
+  if (fn) card.addFullName(fn);
+  else if (!given && !family) {
+    const first = Object.values(row).find((v) => v != null && v !== "");
+    if (first) card.addFullName(String(first));
+  }
+
   if (given || family || middle || pre || suf) {
     card.addName({
       givenName: given || undefined,
@@ -59,15 +68,6 @@ export function buildVCard(
       honorificPrefix: pre || undefined,
       honorificSuffix: suf || undefined,
     });
-  }
-
-  // FN override via assembly
-  const fn = assemble(row, cfg.nameAssembly);
-  if (fn) card.addFullName(fn);
-  else if (!given && !family) {
-    // fallback to first non-empty cell so card isn't empty
-    const first = Object.values(row).find((v) => v != null && v !== "");
-    if (first) card.addFullName(String(first));
   }
 
   // Org

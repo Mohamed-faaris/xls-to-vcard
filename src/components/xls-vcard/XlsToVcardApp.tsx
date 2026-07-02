@@ -17,7 +17,6 @@ import {
   Filter as FilterIcon,
   Sparkles,
   Settings2,
-  GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,12 +32,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { readWorkbook, parseSheet } from "@/lib/xls-vcard/parseXlsx";
 import { autoDetect, emptyMultiEntry, newId } from "@/lib/xls-vcard/autoDetect";
@@ -881,103 +874,23 @@ function NameSection({
   dispatch: React.Dispatch<Action>;
   columns: ColumnMeta[];
 }) {
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-
-  const updatePart = (i: number, patch: Partial<NamePart>) => {
-    const parts = cfg.nameAssembly.map((p, idx) =>
-      idx === i ? ({ ...p, ...patch } as NamePart) : p
-    );
-    dispatch({ type: "name-set", parts });
-  };
-  const removePart = (i: number) => {
-    dispatch({ type: "name-set", parts: cfg.nameAssembly.filter((_, idx) => idx !== i) });
-  };
-  const movePart = (from: number, to: number) => {
-    const parts = [...cfg.nameAssembly];
-    const [moved] = parts.splice(from, 1);
-    parts.splice(to, 0, moved);
-    dispatch({ type: "name-set", parts });
-  };
-  const addPart = (kind: "col" | "const") => {
-    const p: NamePart =
-      kind === "col"
-        ? { kind: "col", columnKey: columns[0]?.key ?? "" }
-        : { kind: "const", value: " " };
-    dispatch({ type: "name-set", parts: [...cfg.nameAssembly, p] });
-  };
   return (
     <Section title="Name" icon={<User className="h-4 w-4" />}>
-      <div>
-        <Label className="text-xs">Full name assembly</Label>
-        <p className="mb-2 text-xs text-muted-foreground">
-          Build the displayed name by combining columns and constant words in order.
-        </p>
-        <div className="space-y-2">
-          {cfg.nameAssembly.map((p, i) => (
-            <div
-              key={i}
-              draggable
-              onDragStart={() => setDragIdx(i)}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.currentTarget.style.opacity = "0.5";
-              }}
-              onDragLeave={(e) => {
-                e.currentTarget.style.opacity = "";
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.currentTarget.style.opacity = "";
-                if (dragIdx !== null && dragIdx !== i) movePart(dragIdx, i);
-                setDragIdx(null);
-              }}
-              onDragEnd={() => setDragIdx(null)}
-              className={cn(
-                "flex items-center gap-2",
-                dragIdx === i && "opacity-40"
-              )}
-            >
-              <div className="cursor-grab text-muted-foreground">
-                <GripVertical className="h-4 w-4" />
-              </div>
-              <Badge variant="outline" className="text-xs shrink-0">
-                {p.kind === "col" ? "Col" : "Text"}
-              </Badge>
-              {p.kind === "col" ? (
-                <div className="flex-1 min-w-0">
-                  <ColSelect
-                    value={p.columnKey}
-                    onChange={(v) => updatePart(i, { columnKey: v ?? "" })}
-                    columns={columns}
-                  />
-                </div>
-              ) : (
-                <Input
-                  className="h-8 flex-1 text-sm"
-                  value={p.value}
-                  onChange={(e) => updatePart(i, { value: e.target.value })}
-                  placeholder="constant text"
-                />
-              )}
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 shrink-0"
-                onClick={() => removePart(i)}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => addPart("col")}>
-              <Plus className="h-3 w-3" /> Column
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => addPart("const")}>
-              <Plus className="h-3 w-3" /> Constant text
-            </Button>
-          </div>
-        </div>
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+        <Field label="First name">
+          <ColSelect
+            value={cfg.givenName}
+            onChange={(v) => dispatch({ type: "patch", patch: { givenName: v } })}
+            columns={columns}
+          />
+        </Field>
+        <Field label="Last name">
+          <ColSelect
+            value={cfg.familyName}
+            onChange={(v) => dispatch({ type: "patch", patch: { familyName: v } })}
+            columns={columns}
+          />
+        </Field>
       </div>
       {cfg.mode === "advanced" && (
         <>
@@ -990,7 +903,7 @@ function NameSection({
                 columns={columns}
               />
               <p className="mt-0.5 text-[10px] text-muted-foreground">
-                Splits on first space → given<em> </em>family when individual fields are empty
+                Splits on first space → given + family when individual fields are empty
               </p>
             </Field>
             <Field label="Prefix (Mr., Dr.)">
@@ -1000,24 +913,10 @@ function NameSection({
                 columns={columns}
               />
             </Field>
-            <Field label="Given name">
-              <ColSelect
-                value={cfg.givenName}
-                onChange={(v) => dispatch({ type: "patch", patch: { givenName: v } })}
-                columns={columns}
-              />
-            </Field>
             <Field label="Middle name(s)">
               <ColSelect
                 value={cfg.additionalNames}
                 onChange={(v) => dispatch({ type: "patch", patch: { additionalNames: v } })}
-                columns={columns}
-              />
-            </Field>
-            <Field label="Family name">
-              <ColSelect
-                value={cfg.familyName}
-                onChange={(v) => dispatch({ type: "patch", patch: { familyName: v } })}
                 columns={columns}
               />
             </Field>
@@ -1586,7 +1485,7 @@ function LivePreview({
           </TabsList>
           <TabsContent value="card" className="p-4">
             {row ? (
-              <ContactCard vcf={vcfText} row={row} cfg={cfg} headerMap={headerMap} />
+              <ContactCard vcf={vcfText} />
             ) : (
               <p className="text-sm text-muted-foreground">No rows to preview.</p>
             )}
@@ -1602,39 +1501,10 @@ function LivePreview({
   );
 }
 
-function cellText(row: Record<string, CellValue>, key: string | null): string {
-  if (!key) return "";
-  const v = row[key];
-  if (v == null) return "";
-  return String(v).trim();
-}
-
-function nameBreakdown(
-  row: Record<string, CellValue>,
-  parts: NamePart[],
-  headerMap: Map<string, string>,
-) {
-  return parts.map((p, i) => {
-    if (p.kind === "col") {
-      const col = p.columnKey;
-      const header = headerMap.get(col) ?? col;
-      const val = cellText(row, col);
-      return { label: `"${header}"`, value: val || "—" };
-    }
-    return { label: "constant", value: p.value };
-  });
-}
-
 function ContactCard({
   vcf,
-  row,
-  cfg,
-  headerMap,
 }: {
   vcf: string;
-  row: Record<string, CellValue>;
-  cfg: MappingConfig;
-  headerMap: Map<string, string>;
 }) {
   const lines = vcf.split(/\r?\n/).filter(Boolean);
   const get = (key: string) => {
@@ -1672,9 +1542,6 @@ function ContactCard({
     .join("")
     .toUpperCase();
 
-  const breakdown = nameBreakdown(row, cfg.nameAssembly, headerMap);
-  const hasBreakdown = breakdown.length > 0;
-
   function parseAdr(val: string) {
     const parts = val.split(";");
     const labels = ["", "", "street", "city", "region", "zip", "country"];
@@ -1684,41 +1551,20 @@ function ContactCard({
   }
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className="flex h-12 w-12 cursor-help items-center justify-center rounded-full bg-primary text-lg font-semibold text-primary-foreground"
-              >
-                {initials || "?"}
-              </button>
-            </TooltipTrigger>
-            {hasBreakdown && (
-              <TooltipContent side="top" className="max-w-64">
-                <p className="mb-1.5 text-xs font-semibold">FN breakdown</p>
-                <div className="space-y-1">
-                  {breakdown.map((b, i) => (
-                    <div key={i} className="flex gap-2 text-[11px] leading-tight">
-                      <span className="shrink-0 text-muted-foreground/70">{b.label}</span>
-                      <span className="truncate">→ {b.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </TooltipContent>
-            )}
-          </Tooltip>
-          <div className="min-w-0">
-            <div className="truncate font-medium">{fn}</div>
-            {(title || role || org) && (
-              <div className="truncate text-xs text-muted-foreground">
-                {[title, role, org].filter(Boolean).join(" · ")}
-              </div>
-            )}
-          </div>
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-semibold text-primary-foreground">
+          {initials || "?"}
         </div>
+        <div className="min-w-0">
+          <div className="truncate font-medium">{fn}</div>
+          {(title || role || org) && (
+            <div className="truncate text-xs text-muted-foreground">
+              {[title, role, org].filter(Boolean).join(" · ")}
+            </div>
+          )}
+        </div>
+      </div>
         {phones.length > 0 && (
           <div className="space-y-1">
             {phones.map((p, i) => (
@@ -1771,7 +1617,6 @@ function ContactCard({
           </div>
         )}
       </div>
-    </TooltipProvider>
   );
 }
 

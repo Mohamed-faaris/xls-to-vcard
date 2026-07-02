@@ -65,9 +65,8 @@ export function buildVCard(
     }
   }
 
-  // FN must be set before addName() — addName auto-generates FN and will
-  // skip it if FN is already set (checks hasProperty('FN') internally).
-  const fn = assemble(row, cfg.nameAssembly);
+  // FN is first + last name, skip auto-assembly
+  const fn = [given, family].filter(Boolean).join(" ");
   if (fn) card.addFullName(fn);
   else if (!given && !family) {
     const first = Object.values(row).find((v) => v != null && v !== "");

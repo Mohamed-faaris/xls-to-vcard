@@ -362,6 +362,9 @@ export function XlsToVcardApp() {
             firstRowIsHeader={firstRowIsHeader}
             setFirstRowIsHeader={setFirstRowIsHeader}
             parsed={parsed}
+            filters={filters}
+            setFilters={setFilters}
+            filteredRows={filteredRows}
             onBack={() => setStep("drop")}
             onNext={enterMapping}
           />
@@ -507,6 +510,9 @@ function PreviewStep(props: {
   firstRowIsHeader: boolean;
   setFirstRowIsHeader: (b: boolean) => void;
   parsed: ParsedSheet | null;
+  filters: FilterRow[];
+  setFilters: (f: FilterRow[]) => void;
+  filteredRows: Record<string, CellValue>[];
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -519,6 +525,9 @@ function PreviewStep(props: {
     firstRowIsHeader,
     setFirstRowIsHeader,
     parsed,
+    filters,
+    setFilters,
+    filteredRows,
     onBack,
     onNext,
   } = props;
@@ -570,9 +579,21 @@ function PreviewStep(props: {
         </div>
       </div>
 
+      {parsed && (
+        <FilterSection
+          filters={filters}
+          setFilters={setFilters}
+          columns={parsed.columns}
+          totalCount={parsed.rows.length}
+          filteredCount={filteredRows.length}
+        />
+      )}
+
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         <div className="border-b border-border px-4 py-2 text-xs text-muted-foreground">
-          Preview — {parsed?.rows.length ?? 0} data rows detected
+          {filteredRows.length < (parsed?.rows.length ?? 0)
+            ? `${filteredRows.length} of ${parsed?.rows.length ?? 0} rows`
+            : `Preview — ${parsed?.rows.length ?? 0} data rows detected`}
         </div>
         <div className="max-h-96 overflow-auto">
           <table className="w-full text-sm">
@@ -589,7 +610,7 @@ function PreviewStep(props: {
               </tr>
             </thead>
             <tbody>
-              {parsed?.rows.slice(0, 20).map((r, i) => (
+              {filteredRows.slice(0, 20).map((r, i) => (
                 <tr key={i} className="border-b border-border last:border-0">
                   {parsed.columns.map((c) => (
                     <td key={c.key} className="px-3 py-2 text-muted-foreground">
@@ -609,9 +630,9 @@ function PreviewStep(props: {
         </Button>
         <Button
           onClick={onNext}
-          disabled={!parsed || parsed.rows.length === 0}
+          disabled={!parsed || filteredRows.length === 0}
         >
-          Continue to mapping
+          Continue ({filteredRows.length})
         </Button>
       </div>
     </div>

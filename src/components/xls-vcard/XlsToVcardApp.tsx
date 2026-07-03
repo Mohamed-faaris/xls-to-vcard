@@ -2086,11 +2086,24 @@ function ExportStep({
               </Button>
             </div>
           </div>
-          <div className="space-y-3 p-4">
-            {vcards.map((vcf, i) => (
-              <ContactCard key={i} vcf={vcf} />
-            ))}
-          </div>
+          <Tabs defaultValue="card">
+            <TabsList className="mx-4 mt-3">
+              <TabsTrigger value="card">Card</TabsTrigger>
+              <TabsTrigger value="raw">.vcf</TabsTrigger>
+            </TabsList>
+            <TabsContent value="card" className="p-4">
+              <div className="space-y-3">
+                {vcards.map((vcf, i) => (
+                  <ContactCard key={i} vcf={vcf} />
+                ))}
+              </div>
+            </TabsContent>
+            <TabsContent value="raw" className="p-4">
+              <pre className="max-h-[300px] sm:max-h-[500px] overflow-auto rounded-md bg-muted p-3 font-mono text-xs">
+                {vcards.join("\n") || "—"}
+              </pre>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

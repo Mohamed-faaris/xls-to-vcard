@@ -74,7 +74,7 @@ type Action =
   | { type: "cp-add" }
   | { type: "cp-remove"; id: string }
   | { type: "cp-update"; id: string; patch: Partial<CustomPropEntry> }
-  | { type: "ex-add" }
+  | { type: "ex-add"; kind?: "text" | "column" }
   | { type: "ex-remove"; id: string }
   | { type: "ex-update"; id: string; patch: Partial<ExtraConstantField> };
 
@@ -151,7 +151,11 @@ function reducer(state: MappingConfig, action: Action): MappingConfig {
         ...state,
         extraConstants: [
           ...state.extraConstants,
-          { id: newId(), target: "note", value: "" },
+          action.kind === "column"
+            ? { id: newId(), target: "category" as const, value: "", columnKey: null }
+            : action.kind === "text"
+              ? { id: newId(), target: "category" as const, value: "" }
+              : { id: newId(), target: "note" as const, value: "" },
         ],
       };
     case "ex-remove":
@@ -860,25 +864,36 @@ function MapStep(props: {
                 title="Categories"
                 icon={<Tag className="h-4 w-4" />}
                 action={
-                  <Button size="sm" variant="outline" onClick={() => dispatch({ type: "ex-add" })}>
-                    <Plus className="h-3 w-3" /> Add text
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" onClick={() => dispatch({ type: "ex-add", kind: "text" })}>
+                      <Plus className="h-3 w-3" /> Text
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => dispatch({ type: "ex-add", kind: "column" })}>
+                      <Plus className="h-3 w-3" /> Column
+                    </Button>
+                  </div>
                 }
               >
-                <ColSelect
-                  value={cfg.categories}
-                  onChange={(v) => dispatch({ type: "patch", patch: { categories: v } })}
-                  columns={parsed.columns}
-                  placeholder="From column..."
-                />
+                {cfg.extraConstants.filter((e) => e.target === "category").length === 0 && (
+                  <p className="text-xs text-muted-foreground">None added.</p>
+                )}
                 {cfg.extraConstants.filter((e) => e.target === "category").map((e) => (
                   <div key={e.id} className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
-                    <Input
-                      className="h-8 text-sm flex-1"
-                      placeholder="Category text"
-                      value={e.value}
-                      onChange={(ev) => dispatch({ type: "ex-update", id: e.id, patch: { value: ev.target.value, target: "category" } })}
-                    />
+                    {"columnKey" in e && e.columnKey !== undefined ? (
+                      <ColSelect
+                        value={e.columnKey ?? null}
+                        onChange={(v) => dispatch({ type: "ex-update", id: e.id, patch: { columnKey: v } })}
+                        columns={parsed.columns}
+                        placeholder="Choose column..."
+                      />
+                    ) : (
+                      <Input
+                        className="h-8 text-sm flex-1"
+                        placeholder="Category text"
+                        value={e.value}
+                        onChange={(ev) => dispatch({ type: "ex-update", id: e.id, patch: { value: ev.target.value } })}
+                      />
+                    )}
                     <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => dispatch({ type: "ex-remove", id: e.id })}>
                       <Trash2 className="h-3 w-3" />
                     </Button>

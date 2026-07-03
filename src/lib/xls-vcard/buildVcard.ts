@@ -186,12 +186,22 @@ export function buildVCard(
     }
   }
 
-  // Categories / note
-  let cats = "";
+  // Categories
+  const allCats: string[] = [];
   if (cfg.categories) {
-    cats = cfg.categories in row ? cell(row, cfg.categories) : cfg.categories;
+    const v = cfg.categories in row ? cell(row, cfg.categories) : cfg.categories;
+    if (v) allCats.push(...v.split(/[,;]/).map((s) => s.trim()).filter(Boolean));
   }
-  if (cats) card.addCategories(cats.split(/[,;]/).map((s) => s.trim()).filter(Boolean));
+  for (const ex of cfg.extraConstants) {
+    if (ex.target !== "category") continue;
+    if (ex.columnKey) {
+      const v = cell(row, ex.columnKey);
+      if (v) allCats.push(...v.split(/[,;]/).map((s) => s.trim()).filter(Boolean));
+    } else if (ex.value) {
+      allCats.push(...ex.value.split(/[,;]/).map((s) => s.trim()).filter(Boolean));
+    }
+  }
+  if (allCats.length > 0) card.addCategories(allCats);
   const note = cell(row, cfg.note);
   if (note) card.addNote(note);
 
@@ -210,14 +220,13 @@ export function buildVCard(
 
   // Extra constants
   for (const ex of cfg.extraConstants) {
-    if (!ex.value) continue;
+    if (!ex.value && !ex.columnKey) continue;
     switch (ex.target) {
       case "note":
         card.addNote(ex.value);
         break;
       case "category":
-        card.addCategories([ex.value]);
-        break;
+        break; // handled above
       case "url":
         card.addUrl({ url: ex.value });
         break;

@@ -58,6 +58,7 @@ export interface ExtraConstantField {
   target: "note" | "category" | "url" | "org" | "title" | "custom";
   customName?: string;
   value: string;
+  columnKey?: string | null;
 }
 
 export interface MappingConfig {

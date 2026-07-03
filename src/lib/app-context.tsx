@@ -6,7 +6,7 @@ import { applyFilters } from "./xls-vcard/applyFilters";
 import { readWorkbook, parseSheet } from "./xls-vcard/parseXlsx";
 import * as XLSX from "xlsx";
 
-type Action =
+export type Action =
   | { type: "set"; cfg: MappingConfig }
   | { type: "patch"; patch: Partial<MappingConfig> }
   | { type: "multi-add"; group: "phones" | "emails" | "dates" | "urls" }

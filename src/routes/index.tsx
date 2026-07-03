@@ -1,5 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { XlsToVcardApp } from "@/components/xls-vcard/XlsToVcardApp";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAppState } from "@/lib/app-context";
+import { AppShell } from "@/components/xls-vcard/AppShell";
+import { DropStep } from "@/components/xls-vcard/XlsToVcardApp";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -23,5 +25,16 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  return <XlsToVcardApp />;
+  const { handleFile } = useAppState();
+  const navigate = useNavigate();
+
+  return (
+    <AppShell>
+      <DropStep
+        onFile={(f) => {
+          handleFile(f).then(() => navigate({ to: "/preview" }));
+        }}
+      />
+    </AppShell>
+  );
 }

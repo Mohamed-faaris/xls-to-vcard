@@ -52,32 +52,11 @@ import type {
   AddressEntry,
 } from "@/lib/xls-vcard/types";
 import * as XLSX from "xlsx";
+import type { Action } from "@/lib/app-context";
 
 type Step = "drop" | "preview" | "map" | "export";
 
-type Action =
-  | { type: "set"; cfg: MappingConfig }
-  | { type: "patch"; patch: Partial<MappingConfig> }
-  | { type: "multi-add"; group: "phones" | "emails" | "dates" | "urls" }
-  | { type: "multi-remove"; group: "phones" | "emails" | "dates" | "urls"; id: string }
-  | {
-      type: "multi-update";
-      group: "phones" | "emails" | "dates" | "urls";
-      id: string;
-      patch: Partial<MultiFieldEntry>;
-    }
-  | { type: "name-set"; parts: NamePart[] }
-  | { type: "firstName-set"; parts: NamePart[] }
-  | { type: "lastName-set"; parts: NamePart[] }
-  | { type: "addr-add" }
-  | { type: "addr-remove"; id: string }
-  | { type: "addr-update"; id: string; patch: Partial<AddressEntry> }
-  | { type: "cp-add" }
-  | { type: "cp-remove"; id: string }
-  | { type: "cp-update"; id: string; patch: Partial<CustomPropEntry> }
-  | { type: "ex-add"; kind?: "text" | "column" }
-  | { type: "ex-remove"; id: string }
-  | { type: "ex-update"; id: string; patch: Partial<ExtraConstantField> };
+export type { Step };
 
 function reducer(state: MappingConfig, action: Action): MappingConfig {
   switch (action.type) {
@@ -510,7 +489,7 @@ export function XlsToVcardApp() {
   );
 }
 
-function Stepper({
+export function Stepper({
   step,
   onNavigate,
 }: {
@@ -563,7 +542,7 @@ function Stepper({
   );
 }
 
-function DropStep({ onFile }: { onFile: (f: File) => void }) {
+export function DropStep({ onFile }: { onFile: (f: File) => void }) {
   const [drag, setDrag] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   return (
@@ -613,8 +592,8 @@ function DropStep({ onFile }: { onFile: (f: File) => void }) {
   );
 }
 
-function PreviewStep(props: {
-  wb: WorkbookData;
+export function PreviewStep(props: {
+  wb: WorkbookData | null;
   sheetName: string;
   setSheetName: (s: string) => void;
   skipRows: number;
@@ -654,7 +633,7 @@ function PreviewStep(props: {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {wb.sheets.map((s) => (
+                {(wb?.sheets ?? []).map((s) => (
                   <SelectItem key={s.name} value={s.name}>
                     {s.name} ({s.rowCount} rows)
                   </SelectItem>
@@ -724,7 +703,7 @@ function PreviewStep(props: {
             <tbody>
               {filteredRows.slice(0, 20).map((r, i) => (
                 <tr key={i} className="border-b border-border last:border-0">
-                  {parsed.columns.map((c) => (
+                  {(parsed?.columns ?? []).map((c) => (
                     <td key={c.key} className="px-3 py-2 text-muted-foreground">
                       {formatCell(r[c.key])}
                     </td>
@@ -751,13 +730,13 @@ function PreviewStep(props: {
   );
 }
 
-function formatCell(v: CellValue): string {
+export function formatCell(v: CellValue): string {
   if (v == null) return "";
   if (v instanceof Date) return v.toLocaleDateString();
   return String(v);
 }
 
-function MapStep(props: {
+export function MapStep(props: {
   parsed: ParsedSheet;
   cfg: MappingConfig;
   dispatch: React.Dispatch<Action>;
@@ -973,7 +952,7 @@ function MapStep(props: {
   );
 }
 
-function Section({
+export function Section({
   title,
   icon,
   children,
@@ -998,7 +977,7 @@ function Section({
   );
 }
 
-function ColSelect({
+export function ColSelect({
   value,
   onChange,
   columns,
@@ -1576,7 +1555,7 @@ function ExtraConstantsSection({
   );
 }
 
-function FilterSection({
+export function FilterSection({
   filters,
   setFilters,
   columns,
@@ -1658,7 +1637,7 @@ function FilterSection({
   );
 }
 
-function LivePreview({
+export function LivePreview({
   row,
   cfg,
   headerMap,
@@ -1767,7 +1746,7 @@ function LivePreview({
   );
 }
 
-function ContactCard({ vcf }: { vcf: string }) {
+export function ContactCard({ vcf }: { vcf: string }) {
   const lines = vcf.split(/\r?\n/).filter(Boolean);
 
   const groupLabels = new Map<string, string>();
@@ -1956,7 +1935,7 @@ function Row({ icon, label, value }: { icon: React.ReactNode; label: string; val
   );
 }
 
-function ExportStep({
+export function ExportStep({
   count,
   fileName,
   onFileNameChange,

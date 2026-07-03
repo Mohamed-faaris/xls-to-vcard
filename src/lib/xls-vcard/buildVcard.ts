@@ -21,12 +21,27 @@ function assemble(row: Record<string, CellValue>, parts: NamePart[]): string {
     .trim();
 }
 
+const GENERIC = new Set(["phone", "number", "tel", "telephone", "no", "num", "contact"]);
+
+function labelFromHeaderSuffix(header: string): string {
+  const tokens = header.split(/[_\-\s()]+/).filter(Boolean);
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const t = tokens[i].toLowerCase();
+    if (GENERIC.has(t)) continue;
+    if (/^mobile$|^cell$/i.test(t)) return "CELL";
+    if (/^work$|^office$|^business$/i.test(t)) return "WORK";
+    if (/^home$/i.test(t)) return "HOME";
+    if (/^fax$/i.test(t)) return "FAX";
+    if (/^main$/i.test(t)) return "MAIN";
+    if (/^pager$/i.test(t)) return "PAGER";
+    if (/^other$/i.test(t)) return "OTHER";
+  }
+  return "";
+}
+
 function entryLabel(row: Record<string, CellValue>, e: MultiFieldEntry, headerFallback: string): string {
   if (e.labelStrategy === "column" && e.labelColumnKey) return cell(row, e.labelColumnKey).toUpperCase();
-  if (e.labelStrategy === "suffix") {
-    const m = headerFallback.match(/[_\-\s]+(.+)$/);
-    if (m) return m[1].toUpperCase().replace(/[^A-Z0-9]/g, "");
-  }
+  if (e.labelStrategy === "suffix") return labelFromHeaderSuffix(headerFallback);
   return e.customLabel.toUpperCase();
 }
 
@@ -172,7 +187,10 @@ export function buildVCard(
   }
 
   // Categories / note
-  const cats = cell(row, cfg.categories);
+  let cats = "";
+  if (cfg.categories) {
+    cats = cfg.categories in row ? cell(row, cfg.categories) : cfg.categories;
+  }
   if (cats) card.addCategories(cats.split(/[,;]/).map((s) => s.trim()).filter(Boolean));
   const note = cell(row, cfg.note);
   if (note) card.addNote(note);

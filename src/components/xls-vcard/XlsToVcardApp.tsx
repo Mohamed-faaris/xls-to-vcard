@@ -208,6 +208,7 @@ export function XlsToVcardApp() {
   const [previewRowIdx, setPreviewRowIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState("contacts");
+  const [splitPhones, setSplitPhones] = useState(false);
 
   // ── Session persistence ──────────────────────────────────────────
   const STORAGE_KEY = "xls-vcard-session";
@@ -224,6 +225,7 @@ export function XlsToVcardApp() {
         filters,
         previewRowIdx,
         fileName,
+        splitPhones,
         columns: parsed.columns,
         rows: parsed.rows,
       };
@@ -250,6 +252,7 @@ export function XlsToVcardApp() {
       setPreviewRowIdx(saved.previewRowIdx ?? 0);
       setFilters(saved.filters ?? []);
       setFileName(saved.fileName ?? "contacts");
+      setSplitPhones(saved.splitPhones ?? false);
       dispatch({ type: "set", cfg: saved.cfg ?? emptyCfg });
       if (saved.columns && saved.rows) {
         setParsed({ columns: saved.columns, rows: saved.rows });
@@ -267,7 +270,7 @@ export function XlsToVcardApp() {
       setSkipRows(0);
       setFirstRowIsHeader(true);
       setStep("preview");
-      setFileName(f.name.replace(/\.[^.]+$/, "") || "contacts");
+      setFileName(f.name.replace(/\.[^.]+$/, "").replace(/\s*\(\d+\)\s*$/, "").trim() || "contacts");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -308,6 +311,7 @@ export function XlsToVcardApp() {
     setSheetName("");
     setFilters([]);
     setFileName("contacts");
+    setSplitPhones(false);
     dispatch({ type: "set", cfg: emptyCfg });
     localStorage.removeItem("xls-vcard-session");
   };
@@ -322,7 +326,49 @@ export function XlsToVcardApp() {
 
   const download = () => {
     if (!parsed) return;
-    const text = buildAllVCards(filteredRows, cfg, headerMap);
+
+    const cell = (row: Record<string, CellValue>, key: string | null): string => {
+      if (!key) return "";
+      const v = row[key];
+      if (v == null) return "";
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return String(v).trim();
+    };
+
+    let text: string;
+    if (splitPhones) {
+      const parts: string[] = [];
+      for (const row of filteredRows) {
+        const validPhones = cfg.phones.filter((e) => e.columnKey && cell(row, e.columnKey));
+        if (validPhones.length <= 1) {
+          parts.push(buildVCardText(row, cfg, headerMap));
+        } else {
+          for (const pe of validPhones) {
+            const header = headerMap.get(pe.columnKey!) ?? "";
+            const splitCfg: MappingConfig = {
+              ...cfg,
+              phones: [pe],
+            };
+            const lastNameParts: NamePart[] = [];
+            if (cfg.lastNameAssembly.length > 0) {
+              lastNameParts.push(...cfg.lastNameAssembly);
+            } else if (cfg.familyName) {
+              lastNameParts.push({ kind: "col", columnKey: cfg.familyName });
+            }
+            if (lastNameParts.length > 0) {
+              lastNameParts.push({ kind: "const", value: ` (${header})` });
+              splitCfg.lastNameAssembly = lastNameParts;
+              splitCfg.familyName = null;
+            }
+            parts.push(buildVCardText(row, splitCfg, headerMap));
+          }
+        }
+      }
+      text = parts.join("\n");
+    } else {
+      text = buildAllVCards(filteredRows, cfg, headerMap);
+    }
+
     const blob = new Blob([text], { type: "text/vcard;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -333,7 +379,7 @@ export function XlsToVcardApp() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col justify-between">
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-4">
           <div className="flex items-center gap-2">
@@ -356,7 +402,7 @@ export function XlsToVcardApp() {
         <Stepper step={step} onNavigate={handleStepNav} />
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 w-full" style={{ flexGrow: 1 }}>
         {error && (
           <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
             {error}
@@ -394,6 +440,8 @@ export function XlsToVcardApp() {
             headerMap={headerMap}
             onBack={() => setStep("preview")}
             onNext={() => setStep("export")}
+            splitPhones={splitPhones}
+            setSplitPhones={setSplitPhones}
           />
         )}
         {step === "export" && parsed && (
@@ -412,8 +460,11 @@ export function XlsToVcardApp() {
           href="https://github.com/Mohamed-faaris/xls-to-vcard"
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
         >
+          <svg viewBox="0 0 1024 1024" fill="none" className="h-4 w-4">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/>
+          </svg>
           Star on GitHub — fork, contribute, report issues
         </a>
       </footer>
@@ -478,7 +529,7 @@ function DropStep({ onFile }: { onFile: (f: File) => void }) {
   const [drag, setDrag] = useState(false);
   return (
     <div className="flex flex-col items-center py-16">
-      <label
+      <div
         onDragOver={(e) => {
           e.preventDefault();
           setDrag(true);
@@ -498,6 +549,7 @@ function DropStep({ onFile }: { onFile: (f: File) => void }) {
         )}
       >
         <input
+          id="file-input"
           type="file"
           accept=".xls,.xlsx,.csv"
           className="hidden"
@@ -506,15 +558,17 @@ function DropStep({ onFile }: { onFile: (f: File) => void }) {
             if (f) onFile(f);
           }}
         />
-        <Upload className="mb-4 h-10 w-10 text-muted-foreground" />
-        <p className="text-base font-medium">Drop your spreadsheet here</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          .xls, .xlsx, or .csv — everything stays in your browser
-        </p>
-        <Button className="mt-6" variant="outline">
+        <label htmlFor="file-input" className="flex cursor-pointer flex-col items-center">
+          <Upload className="mb-4 h-10 w-10 text-muted-foreground" />
+          <p className="text-base font-medium">Drop your spreadsheet here</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            .xls, .xlsx, or .csv — everything stays in your browser
+          </p>
+        </label>
+        <Button className="mt-6" variant="outline" onClick={() => document.getElementById("file-input")?.click()}>
           Choose file
         </Button>
-      </label>
+      </div>
     </div>
   );
 }
@@ -676,6 +730,8 @@ function MapStep(props: {
   headerMap: Map<string, string>;
   onBack: () => void;
   onNext: () => void;
+  splitPhones: boolean;
+  setSplitPhones: (v: boolean) => void;
 }) {
   const {
     parsed,
@@ -690,6 +746,8 @@ function MapStep(props: {
     headerMap,
     onBack,
     onNext,
+    splitPhones,
+    setSplitPhones,
   } = props;
 
   return (
@@ -737,7 +795,7 @@ function MapStep(props: {
           </TabsList>
 
           <TabsContent value="mapping" className="space-y-4">
-            <NameSection cfg={cfg} dispatch={dispatch} columns={parsed.columns} />
+            <NameSection cfg={cfg} dispatch={dispatch} columns={parsed.columns} advanced={cfg.mode === "advanced"} />
             <MultiSection
               title="Phone numbers"
               icon={<Phone className="h-4 w-4" />}
@@ -746,6 +804,20 @@ function MapStep(props: {
               dispatch={dispatch}
               columns={parsed.columns}
               advanced={cfg.mode === "advanced"}
+              footer={
+                cfg.phones.length > 1 ? (
+                  <div className="flex items-center gap-2 border-t border-border pt-3">
+                    <Switch
+                      id="split-phones"
+                      checked={splitPhones}
+                      onCheckedChange={setSplitPhones}
+                    />
+                    <Label htmlFor="split-phones" className="text-xs cursor-pointer">
+                      Split each phone number into a separate contact
+                    </Label>
+                  </div>
+                ) : undefined
+              }
             />
             <MultiSection
               title="Email addresses"
@@ -782,6 +854,37 @@ function MapStep(props: {
                 <CustomPropsSection cfg={cfg} dispatch={dispatch} columns={parsed.columns} />
                 <ExtraConstantsSection cfg={cfg} dispatch={dispatch} />
               </>
+            )}
+            {cfg.mode !== "advanced" && (
+              <Section
+                title="Categories"
+                icon={<Tag className="h-4 w-4" />}
+                action={
+                  <Button size="sm" variant="outline" onClick={() => dispatch({ type: "ex-add" })}>
+                    <Plus className="h-3 w-3" /> Add text
+                  </Button>
+                }
+              >
+                <ColSelect
+                  value={cfg.categories}
+                  onChange={(v) => dispatch({ type: "patch", patch: { categories: v } })}
+                  columns={parsed.columns}
+                  placeholder="From column..."
+                />
+                {cfg.extraConstants.filter((e) => e.target === "category").map((e) => (
+                  <div key={e.id} className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
+                    <Input
+                      className="h-8 text-sm flex-1"
+                      placeholder="Category text"
+                      value={e.value}
+                      onChange={(ev) => dispatch({ type: "ex-update", id: e.id, patch: { value: ev.target.value, target: "category" } })}
+                    />
+                    <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => dispatch({ type: "ex-remove", id: e.id })}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </Section>
             )}
           </TabsContent>
 
@@ -965,10 +1068,12 @@ function NameSection({
   cfg,
   dispatch,
   columns,
+  advanced,
 }: {
   cfg: MappingConfig;
   dispatch: React.Dispatch<Action>;
   columns: ColumnMeta[];
+  advanced?: boolean;
 }) {
   return (
     <Section title="Name" icon={<User className="h-4 w-4" />}>
@@ -976,22 +1081,26 @@ function NameSection({
         <NameAssembler label="First name" parts={cfg.firstNameAssembly} columns={columns} onParts={(p) => dispatch({ type: "firstName-set", parts: p })} />
         <NameAssembler label="Last name" parts={cfg.lastNameAssembly} columns={columns} onParts={(p) => dispatch({ type: "lastName-set", parts: p })} />
       </div>
-      <Separator />
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-        <Field label="Full name (auto-split)">
-          <ColSelect value={cfg.fullName} onChange={(v) => dispatch({ type: "patch", patch: { fullName: v } })} columns={columns} />
-          <p className="mt-0.5 text-[10px] text-muted-foreground">Splits on first space when assemblers above are empty</p>
-        </Field>
-        <Field label="Prefix (Mr., Dr.)">
-          <ColSelect value={cfg.honorificPrefix} onChange={(v) => dispatch({ type: "patch", patch: { honorificPrefix: v } })} columns={columns} />
-        </Field>
-        <Field label="Middle name(s)">
-          <ColSelect value={cfg.additionalNames} onChange={(v) => dispatch({ type: "patch", patch: { additionalNames: v } })} columns={columns} />
-        </Field>
-        <Field label="Suffix (Jr., PhD)">
-          <ColSelect value={cfg.honorificSuffix} onChange={(v) => dispatch({ type: "patch", patch: { honorificSuffix: v } })} columns={columns} />
-        </Field>
-      </div>
+      {advanced && (
+        <>
+          <Separator />
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+            <Field label="Full name (auto-split)">
+              <ColSelect value={cfg.fullName} onChange={(v) => dispatch({ type: "patch", patch: { fullName: v } })} columns={columns} />
+              <p className="mt-0.5 text-[10px] text-muted-foreground">Splits on first space when assemblers above are empty</p>
+            </Field>
+            <Field label="Prefix (Mr., Dr.)">
+              <ColSelect value={cfg.honorificPrefix} onChange={(v) => dispatch({ type: "patch", patch: { honorificPrefix: v } })} columns={columns} />
+            </Field>
+            <Field label="Middle name(s)">
+              <ColSelect value={cfg.additionalNames} onChange={(v) => dispatch({ type: "patch", patch: { additionalNames: v } })} columns={columns} />
+            </Field>
+            <Field label="Suffix (Jr., PhD)">
+              <ColSelect value={cfg.honorificSuffix} onChange={(v) => dispatch({ type: "patch", patch: { honorificSuffix: v } })} columns={columns} />
+            </Field>
+          </div>
+        </>
+      )}
     </Section>
   );
 }
@@ -1013,6 +1122,7 @@ function MultiSection({
   dispatch,
   columns,
   advanced,
+  footer,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -1021,6 +1131,7 @@ function MultiSection({
   dispatch: React.Dispatch<Action>;
   columns: ColumnMeta[];
   advanced: boolean;
+  footer?: React.ReactNode;
 }) {
   return (
     <Section
@@ -1117,6 +1228,7 @@ function MultiSection({
           )}
         </div>
       ))}
+      {footer}
     </Section>
   );
 }
@@ -1563,28 +1675,82 @@ function LivePreview({
   );
 }
 
-function ContactCard({
-  vcf,
-}: {
-  vcf: string;
-}) {
+function ContactCard({ vcf }: { vcf: string }) {
   const lines = vcf.split(/\r?\n/).filter(Boolean);
+
+  const groupLabels = new Map<string, string>();
+  for (const l of lines) {
+    const dot = l.indexOf(".");
+    if (dot > 0) {
+      const rest = l.slice(dot + 1).toUpperCase();
+      if (rest.startsWith("X-ABLABEL:")) {
+        groupLabels.set(l.slice(0, dot), rest.slice(rest.indexOf(":") + 1));
+      }
+    }
+  }
+
   const get = (key: string) => {
-    const l = lines.find((l) => l.toUpperCase().startsWith(key + ":") || l.toUpperCase().startsWith(key + ";"));
+    const l = lines.find((l) => {
+      const up = l.toUpperCase();
+      return up.startsWith(key + ":") || up.startsWith(key + ";");
+    });
     if (!l) return "";
     const idx = l.indexOf(":");
     return idx >= 0 ? l.slice(idx + 1) : "";
   };
-  const getAll = (prefix: string) =>
-    lines
-      .filter((l) => l.toUpperCase().startsWith(prefix))
-      .map((l) => {
+
+  const getAll = (prefix: string): { label: string; value: string }[] => {
+    const out: { label: string; value: string }[] = [];
+    for (const l of lines) {
+      const up = l.toUpperCase();
+      if (up.startsWith(prefix + ":") || up.startsWith(prefix + ";")) {
         const idx = l.indexOf(":");
         const head = l.slice(0, idx);
         const val = l.slice(idx + 1);
         const typeMatch = head.match(/TYPE=([^;:]+)/i);
-        return { label: typeMatch?.[1] ?? "", value: val };
-      });
+        out.push({ label: typeMatch?.[1] ?? "", value: val });
+      } else {
+        const dot = l.indexOf(".");
+        if (dot > 0) {
+          const group = l.slice(0, dot);
+          const propUp = l.slice(dot + 1).toUpperCase();
+          if (propUp.startsWith(prefix + ":") || propUp.startsWith(prefix + ";")) {
+            const idx = l.indexOf(":", dot + 1);
+            const val = idx >= 0 ? l.slice(idx + 1) : "";
+            out.push({ label: groupLabels.get(group) ?? "", value: val });
+          }
+        }
+      }
+    }
+    return out;
+  };
+
+  const getAllDates = (): { label: string; value: string }[] => {
+    const out: { label: string; value: string }[] = [];
+    for (const l of lines) {
+      const up = l.toUpperCase();
+      if (up.startsWith("BDAY:") || up.startsWith("BDAY;")) {
+        const idx = l.indexOf(":");
+        if (idx >= 0) out.push({ label: "BIRTHDAY", value: l.slice(idx + 1) });
+      } else if (up.includes("X-ABDATE")) {
+        const dot = l.indexOf(".");
+        let value = "";
+        let label = "";
+        if (dot > 0) {
+          const group = l.slice(0, dot);
+          const idx = l.indexOf(":", dot + 1);
+          value = idx >= 0 ? l.slice(idx + 1) : "";
+          label = groupLabels.get(group) ?? "";
+        } else {
+          const idx = l.indexOf(":");
+          value = idx >= 0 ? l.slice(idx + 1) : "";
+        }
+        if (value) out.push({ label, value });
+      }
+    }
+    return out;
+  };
+
   const fn = get("FN") || "(no name)";
   const org = get("ORG");
   const title = get("TITLE");
@@ -1593,7 +1759,7 @@ function ContactCard({
   const emails = getAll("EMAIL");
   const urls = getAll("URL");
   const adrs = getAll("ADR");
-  const bday = get("BDAY");
+  const dates = getAllDates();
   const categories = get("CATEGORIES");
   const note = get("NOTE");
   const initials = fn
@@ -1627,58 +1793,60 @@ function ContactCard({
           )}
         </div>
       </div>
-        {phones.length > 0 && (
-          <div className="space-y-1">
-            {phones.map((p, i) => (
-              <Row key={i} icon={<Phone className="h-3 w-3" />} label={p.label} value={p.value} />
-            ))}
-          </div>
-        )}
-        {emails.length > 0 && (
-          <div className="space-y-1">
-            {emails.map((e, i) => (
-              <Row key={i} icon={<Mail className="h-3 w-3" />} label={e.label} value={e.value} />
-            ))}
-          </div>
-        )}
-        {urls.length > 0 && (
-          <div className="space-y-1">
-            {urls.map((u, i) => (
-              <Row key={i} icon={<LinkIcon className="h-3 w-3" />} label={u.label} value={u.value} />
-            ))}
-          </div>
-        )}
-        {adrs.length > 0 && (
-          <div className="space-y-1">
-            {adrs.map((a, i) => {
-              const parts = parseAdr(a.value);
-              return (
-                <Row
-                  key={i}
-                  icon={<MapPin className="h-3 w-3" />}
-                  label={a.label}
-                  value={parts.map((p) => p.value).filter(Boolean).join(", ")}
-                />
-              );
-            })}
-          </div>
-        )}
-        {bday && (
-          <div className="space-y-1">
-            <Row icon={<Calendar className="h-3 w-3" />} label="" value={bday} />
-          </div>
-        )}
-        {categories && (
-          <div className="space-y-1">
-            <Row icon={<Tag className="h-3 w-3" />} label="" value={categories} />
-          </div>
-        )}
-        {note && (
-          <div className="rounded-md bg-muted/50 px-2 py-1">
-            <p className="text-xs text-muted-foreground">{note}</p>
-          </div>
-        )}
-      </div>
+      {phones.length > 0 && (
+        <div className="space-y-1">
+          {phones.map((p, i) => (
+            <Row key={i} icon={<Phone className="h-3 w-3" />} label={p.label} value={p.value} />
+          ))}
+        </div>
+      )}
+      {emails.length > 0 && (
+        <div className="space-y-1">
+          {emails.map((e, i) => (
+            <Row key={i} icon={<Mail className="h-3 w-3" />} label={e.label} value={e.value} />
+          ))}
+        </div>
+      )}
+      {urls.length > 0 && (
+        <div className="space-y-1">
+          {urls.map((u, i) => (
+            <Row key={i} icon={<LinkIcon className="h-3 w-3" />} label={u.label} value={u.value} />
+          ))}
+        </div>
+      )}
+      {adrs.length > 0 && (
+        <div className="space-y-1">
+          {adrs.map((a, i) => {
+            const parts = parseAdr(a.value);
+            return (
+              <Row
+                key={i}
+                icon={<MapPin className="h-3 w-3" />}
+                label={a.label}
+                value={parts.map((p) => p.value).filter(Boolean).join(", ")}
+              />
+            );
+          })}
+        </div>
+      )}
+      {dates.length > 0 && (
+        <div className="space-y-1">
+          {dates.map((d, i) => (
+            <Row key={i} icon={<Calendar className="h-3 w-3" />} label={d.label} value={d.value} />
+          ))}
+        </div>
+      )}
+      {categories && (
+        <div className="space-y-1">
+          <Row icon={<Tag className="h-3 w-3" />} label="" value={categories} />
+        </div>
+      )}
+      {note && (
+        <div className="rounded-md bg-muted/50 px-2 py-1">
+          <p className="text-xs text-muted-foreground">{note}</p>
+        </div>
+      )}
+    </div>
   );
 }
 

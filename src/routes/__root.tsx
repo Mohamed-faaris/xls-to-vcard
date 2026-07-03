@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useNavigate,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -37,6 +38,8 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   useEffect(() => {
     reportAppError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
@@ -59,6 +62,19 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Try again
+          </button>
+          <button
+            onClick={() => {
+              localStorage.clear();
+              queryClient.clear();
+              if ("caches" in window) {
+                caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
+              }
+              navigate({ to: "/" });
+            }}
+            className="inline-flex items-center justify-center rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
+          >
+            Clear all data & restart
           </button>
           <a
             href="/"

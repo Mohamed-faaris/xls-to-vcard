@@ -15,14 +15,7 @@ function findAll(cols: ColumnMeta[], patterns: RegExp[]): ColumnMeta[] {
 }
 
 function labelFromHeader(header: string): string {
-  // "Phone_Work" -> "WORK", "Email 2" -> "", "Mobile" -> "CELL"
-  const m = header.match(/[_\-\s]+(.+)$/);
-  if (m) return m[1].toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (/mobile|cell/i.test(header)) return "CELL";
-  if (/work|office|business/i.test(header)) return "WORK";
-  if (/home/i.test(header)) return "HOME";
-  if (/fax/i.test(header)) return "FAX";
-  return "";
+  return header.trim().replace(/[^\w\s-]/g, "");
 }
 
 let idc = 0;

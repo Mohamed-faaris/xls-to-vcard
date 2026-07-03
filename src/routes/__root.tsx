@@ -65,6 +65,17 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           </button>
           <button
             onClick={() => {
+              if ("caches" in window) {
+                caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
+              }
+              window.location.reload();
+            }}
+            className="inline-flex items-center justify-center rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+          >
+            Clear cache only
+          </button>
+          <button
+            onClick={() => {
               localStorage.clear();
               queryClient.clear();
               if ("caches" in window) {

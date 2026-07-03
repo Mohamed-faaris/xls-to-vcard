@@ -382,11 +382,14 @@ export function XlsToVcardApp() {
               lastNameParts.push(...cfg.lastNameAssembly);
             } else if (cfg.familyName) {
               lastNameParts.push({ kind: "col", columnKey: cfg.familyName });
+            } else if (cfg.fullName) {
+              lastNameParts.push({ kind: "col", columnKey: cfg.fullName });
             }
             if (lastNameParts.length > 0) {
               lastNameParts.push({ kind: "const", value: ` (${header})` });
               splitCfg.lastNameAssembly = lastNameParts;
               splitCfg.familyName = null;
+              splitCfg.fullName = null;
             }
             parts.push(buildVCardText(row, splitCfg, headerMap));
           }
@@ -1692,11 +1695,14 @@ function LivePreview({
         lastNameParts.push(...cfg.lastNameAssembly);
       } else if (cfg.familyName) {
         lastNameParts.push({ kind: "col", columnKey: cfg.familyName });
+      } else if (cfg.fullName) {
+        lastNameParts.push({ kind: "col", columnKey: cfg.fullName });
       }
       if (lastNameParts.length > 0) {
         lastNameParts.push({ kind: "const", value: ` (${header})` });
         splitCfg.lastNameAssembly = lastNameParts;
         splitCfg.familyName = null;
+        splitCfg.fullName = null;
       }
       return buildVCardText(row, splitCfg, headerMap);
     });
@@ -1994,11 +2000,14 @@ function ExportStep({
         lastNameParts.push(...cfg.lastNameAssembly);
       } else if (cfg.familyName) {
         lastNameParts.push({ kind: "col", columnKey: cfg.familyName });
+      } else if (cfg.fullName) {
+        lastNameParts.push({ kind: "col", columnKey: cfg.fullName });
       }
       if (lastNameParts.length > 0) {
         lastNameParts.push({ kind: "const", value: ` (${header})` });
         splitCfg.lastNameAssembly = lastNameParts;
         splitCfg.familyName = null;
+        splitCfg.fullName = null;
       }
       return buildVCardText(previewRow, splitCfg, headerMap);
     });

@@ -255,7 +255,7 @@ export function XlsToVcardApp() {
       setFirstRowIsHeader(saved.firstRowIsHeader ?? true);
       setPreviewRowIdx(saved.previewRowIdx ?? 0);
       setFilters(saved.filters ?? []);
-      setFileName(saved.fileName ?? "contacts");
+      setFileName((saved.fileName ?? "contacts").replace(/\s*\(\d+\)\s*/g, "").trim());
       setSplitPhones(saved.splitPhones ?? false);
       dispatch({ type: "set", cfg: saved.cfg ?? emptyCfg });
       if (saved.columns && saved.rows) {
@@ -274,7 +274,7 @@ export function XlsToVcardApp() {
       setSkipRows(0);
       setFirstRowIsHeader(true);
       setStep("preview");
-      setFileName(f.name.replace(/\.[^.]+$/, "").replace(/\s*\(\d+\)\s*$/, "").trim() || "contacts");
+      setFileName(f.name.replace(/\.[^.]+$/, "").replace(/\s*\(\d+\)\s*/g, " ").replace(/\s+/g, " ").trim() || "contacts");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -289,10 +289,16 @@ export function XlsToVcardApp() {
 
   const enterMapping = useCallback(() => {
     if (!parsed) return;
-    dispatch({ type: "set", cfg: autoDetect(parsed.columns) });
+    const detected = autoDetect(parsed.columns);
+    if (fileName && fileName !== "contacts") {
+      detected.extraConstants = [
+        { id: newId(), target: "category" as const, value: fileName, columnKey: null },
+      ];
+    }
+    dispatch({ type: "set", cfg: detected });
     setPreviewRowIdx(0);
     setStep("map");
-  }, [parsed]);
+  }, [parsed, fileName]);
 
   const headerMap = useMemo(() => {
     const m = new Map<string, string>();

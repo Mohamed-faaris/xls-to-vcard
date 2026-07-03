@@ -487,6 +487,9 @@ export function XlsToVcardApp() {
             cfg={cfg}
             headerMap={headerMap}
             splitPhones={splitPhones}
+            rowIdx={previewRowIdx}
+            setRowIdx={setPreviewRowIdx}
+            total={filteredRows.length}
           />
         )}
       </main>
@@ -1964,6 +1967,9 @@ function ExportStep({
   cfg,
   headerMap,
   splitPhones,
+  rowIdx,
+  setRowIdx,
+  total,
 }: {
   count: number;
   fileName: string;
@@ -1975,6 +1981,9 @@ function ExportStep({
   cfg: MappingConfig;
   headerMap: Map<string, string>;
   splitPhones: boolean;
+  rowIdx: number;
+  setRowIdx: (n: number) => void;
+  total: number;
 }) {
   const ext = ".vcf";
   const cell = (row: Record<string, CellValue>, key: string | null): string => {
@@ -2051,7 +2060,32 @@ function ExportStep({
       </div>
       <div className="space-y-3">
         <div className="rounded-lg border border-border bg-card">
-          <div className="border-b border-border px-4 py-3 text-sm font-medium">Live preview</div>
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div className="text-sm font-medium">Live preview</div>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                disabled={rowIdx <= 0}
+                onClick={() => setRowIdx(Math.max(0, rowIdx - 1))}
+              >
+                ‹
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                row {Math.min(rowIdx + 1, total)} / {total}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                disabled={rowIdx >= total - 1}
+                onClick={() => setRowIdx(Math.min(total - 1, rowIdx + 1))}
+              >
+                ›
+              </Button>
+            </div>
+          </div>
           <div className="space-y-3 p-4">
             {vcards.map((vcf, i) => (
               <ContactCard key={i} vcf={vcf} />

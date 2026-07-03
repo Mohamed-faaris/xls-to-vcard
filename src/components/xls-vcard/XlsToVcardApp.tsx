@@ -51,6 +51,7 @@ import type {
   ExtraConstantField,
   AddressEntry,
 } from "@/lib/xls-vcard/types";
+import * as XLSX from "xlsx";
 
 type Step = "drop" | "preview" | "map" | "export";
 
@@ -270,8 +271,25 @@ export function XlsToVcardApp() {
     try {
       const w = await readWorkbook(f);
       setWb(w);
-      setSheetName(w.sheets[0]?.name ?? "");
-      setSkipRows(0);
+      const sheet = w.sheets[0]?.name ?? "";
+      setSheetName(sheet);
+      // Auto-detect skip rows: count leading rows with fewer than 2 non-empty cells
+      const autoSkip = (() => {
+        try {
+          const rawWb = (w.raw as XLSX.WorkBook);
+          const ws = rawWb.Sheets[sheet];
+          if (!ws) return 0;
+          const arr: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: false });
+          let skip = 0;
+          for (const row of arr) {
+            const filled = row.filter((c) => c !== null && c !== "").length;
+            if (filled >= 2) break;
+            skip++;
+          }
+          return skip;
+        } catch { return 0; }
+      })();
+      setSkipRows(autoSkip);
       setFirstRowIsHeader(true);
       setStep("preview");
       setFileName(f.name.replace(/\.[^.]+$/, "").replace(/\s*\(\d+\)\s*/g, " ").replace(/\s+/g, " ").trim() || "contacts");

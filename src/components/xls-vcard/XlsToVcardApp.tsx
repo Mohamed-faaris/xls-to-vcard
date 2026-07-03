@@ -310,7 +310,7 @@ export function XlsToVcardApp() {
     const detected = autoDetect(parsed.columns);
     if (fileName && fileName !== "contacts") {
       detected.extraConstants = [
-        { id: newId(), target: "category" as const, value: fileName, columnKey: null },
+        { id: newId(), target: "category" as const, value: fileName },
       ];
     }
     dispatch({ type: "set", cfg: detected });
@@ -480,6 +480,10 @@ export function XlsToVcardApp() {
             onBack={() => setStep("map")}
             onDownload={download}
             onReset={reset}
+            previewRow={previewRow}
+            cfg={cfg}
+            headerMap={headerMap}
+            splitPhones={splitPhones}
           />
         )}
       </main>
@@ -957,6 +961,7 @@ function MapStep(props: {
         rowIdx={previewRowIdx}
         setRowIdx={setPreviewRowIdx}
         total={filteredRows.length}
+        splitPhones={splitPhones}
       />
     </div>
   );
@@ -1654,6 +1659,7 @@ function LivePreview({
   rowIdx,
   setRowIdx,
   total,
+  splitPhones,
 }: {
   row: Record<string, CellValue> | null;
   cfg: MappingConfig;
@@ -1661,8 +1667,40 @@ function LivePreview({
   rowIdx: number;
   setRowIdx: (n: number) => void;
   total: number;
+  splitPhones?: boolean;
 }) {
-  const vcfText = row ? buildVCardText(row, cfg, headerMap) : "";
+  const cell = (r: Record<string, CellValue>, key: string | null): string => {
+    if (!key) return "";
+    const v = r[key];
+    if (v == null) return "";
+    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    return String(v).trim();
+  };
+  const vcards = (() => {
+    if (!row) return [""];
+    if (!splitPhones) return [buildVCardText(row, cfg, headerMap)];
+    const validPhones = cfg.phones.filter((e) => e.columnKey && cell(row, e.columnKey));
+    if (validPhones.length <= 1) return [buildVCardText(row, cfg, headerMap)];
+    return validPhones.map((pe) => {
+      const header = headerMap.get(pe.columnKey!) ?? "";
+      const splitCfg: MappingConfig = {
+        ...cfg,
+        phones: [pe],
+      };
+      const lastNameParts: NamePart[] = [];
+      if (cfg.lastNameAssembly.length > 0) {
+        lastNameParts.push(...cfg.lastNameAssembly);
+      } else if (cfg.familyName) {
+        lastNameParts.push({ kind: "col", columnKey: cfg.familyName });
+      }
+      if (lastNameParts.length > 0) {
+        lastNameParts.push({ kind: "const", value: ` (${header})` });
+        splitCfg.lastNameAssembly = lastNameParts;
+        splitCfg.familyName = null;
+      }
+      return buildVCardText(row, splitCfg, headerMap);
+    });
+  })();
 
   return (
     <div className="lg:sticky lg:top-4 lg:h-fit">
@@ -1700,14 +1738,18 @@ function LivePreview({
           </TabsList>
           <TabsContent value="card" className="p-4">
             {row ? (
-              <ContactCard vcf={vcfText} />
+              <div className="space-y-3">
+                {vcards.map((vcf, i) => (
+                  <ContactCard key={i} vcf={vcf} />
+                ))}
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">No rows to preview.</p>
             )}
           </TabsContent>
           <TabsContent value="raw" className="p-4">
             <pre className="max-h-[300px] sm:max-h-[500px] overflow-auto rounded-md bg-muted p-3 font-mono text-xs">
-              {vcfText || "—"}
+              {vcards.join("\n") || "—"}
             </pre>
           </TabsContent>
         </Tabs>
@@ -1912,6 +1954,10 @@ function ExportStep({
   onBack,
   onDownload,
   onReset,
+  previewRow,
+  cfg,
+  headerMap,
+  splitPhones,
 }: {
   count: number;
   fileName: string;
@@ -1919,41 +1965,89 @@ function ExportStep({
   onBack: () => void;
   onDownload: () => void;
   onReset: () => void;
+  previewRow: Record<string, CellValue> | null;
+  cfg: MappingConfig;
+  headerMap: Map<string, string>;
+  splitPhones: boolean;
 }) {
   const ext = ".vcf";
+  const cell = (row: Record<string, CellValue>, key: string | null): string => {
+    if (!key) return "";
+    const v = row[key];
+    if (v == null) return "";
+    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    return String(v).trim();
+  };
+  const vcards = (() => {
+    if (!previewRow) return [""];
+    if (!splitPhones) return [buildVCardText(previewRow, cfg, headerMap)];
+    const validPhones = cfg.phones.filter((e) => e.columnKey && cell(previewRow, e.columnKey));
+    if (validPhones.length <= 1) return [buildVCardText(previewRow, cfg, headerMap)];
+    return validPhones.map((pe) => {
+      const header = headerMap.get(pe.columnKey!) ?? "";
+      const splitCfg: MappingConfig = {
+        ...cfg,
+        phones: [pe],
+      };
+      const lastNameParts: NamePart[] = [];
+      if (cfg.lastNameAssembly.length > 0) {
+        lastNameParts.push(...cfg.lastNameAssembly);
+      } else if (cfg.familyName) {
+        lastNameParts.push({ kind: "col", columnKey: cfg.familyName });
+      }
+      if (lastNameParts.length > 0) {
+        lastNameParts.push({ kind: "const", value: ` (${header})` });
+        splitCfg.lastNameAssembly = lastNameParts;
+        splitCfg.familyName = null;
+      }
+      return buildVCardText(previewRow, splitCfg, headerMap);
+    });
+  })();
   return (
-    <div className="flex flex-col items-center py-16">
-      <div className="w-full max-w-md rounded-lg border border-border bg-card p-8 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Download className="h-6 w-6" />
-        </div>
-        <h2 className="text-lg font-semibold">Ready to export</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {count} contact{count === 1 ? "" : "s"} in a single .vcf file
-        </p>
-        <div className="mt-4 text-left">
-          <Label className="text-xs">File name</Label>
-          <div className="mt-1 flex items-center gap-0">
-            <Input
-              className="h-9 flex-1 rounded-r-none text-sm"
-              value={fileName}
-              onChange={(e) => onFileNameChange(e.target.value)}
-            />
-            <div className="flex h-9 items-center rounded-md rounded-l-none border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
-              {ext}
+    <div className="grid gap-6 lg:grid-cols-[1fr_400px] py-8">
+      <div className="flex flex-col items-center justify-center">
+        <div className="w-full max-w-md rounded-lg border border-border bg-card p-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Download className="h-6 w-6" />
+          </div>
+          <h2 className="text-lg font-semibold">Ready to export</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {count} contact{count === 1 ? "" : "s"}{splitPhones ? ` (split into ${vcards.length} per row)` : ""} in a single .vcf file
+          </p>
+          <div className="mt-4 text-left">
+            <Label className="text-xs">File name</Label>
+            <div className="mt-1 flex items-center gap-0">
+              <Input
+                className="h-9 flex-1 rounded-r-none text-sm"
+                value={fileName}
+                onChange={(e) => onFileNameChange(e.target.value)}
+              />
+              <div className="flex h-9 items-center rounded-md rounded-l-none border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+                {ext}
+              </div>
             </div>
           </div>
+          <Button className="mt-4 w-full" onClick={onDownload}>
+            <Download className="h-4 w-4" /> Download{fileName ? ` ${fileName}${ext}` : ""}
+          </Button>
+          <div className="mt-3 flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Button>
+            <Button variant="ghost" className="flex-1" onClick={onReset}>
+              New file
+            </Button>
+          </div>
         </div>
-        <Button className="mt-4 w-full" onClick={onDownload}>
-          <Download className="h-4 w-4" /> Download{fileName ? ` ${fileName}${ext}` : ""}
-        </Button>
-        <div className="mt-3 flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Button>
-          <Button variant="ghost" className="flex-1" onClick={onReset}>
-            New file
-          </Button>
+      </div>
+      <div className="space-y-3">
+        <div className="rounded-lg border border-border bg-card">
+          <div className="border-b border-border px-4 py-3 text-sm font-medium">Live preview</div>
+          <div className="space-y-3 p-4">
+            {vcards.map((vcf, i) => (
+              <ContactCard key={i} vcf={vcf} />
+            ))}
+          </div>
         </div>
       </div>
     </div>

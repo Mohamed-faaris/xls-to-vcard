@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   Upload,
   Download,
@@ -537,6 +537,7 @@ function Stepper({
 
 function DropStep({ onFile }: { onFile: (f: File) => void }) {
   const [drag, setDrag] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col items-center py-16">
       <div
@@ -551,6 +552,7 @@ function DropStep({ onFile }: { onFile: (f: File) => void }) {
           const f = e.dataTransfer.files?.[0];
           if (f) onFile(f);
         }}
+        onClick={() => inputRef.current?.click()}
           className={cn(
             "flex w-full max-w-2xl cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 sm:px-6 py-16 sm:py-20 transition-colors",
           drag
@@ -559,7 +561,7 @@ function DropStep({ onFile }: { onFile: (f: File) => void }) {
         )}
       >
         <input
-          id="file-input"
+          ref={inputRef}
           type="file"
           accept=".xls,.xlsx,.csv"
           className="hidden"
@@ -568,14 +570,14 @@ function DropStep({ onFile }: { onFile: (f: File) => void }) {
             if (f) onFile(f);
           }}
         />
-        <label htmlFor="file-input" className="flex cursor-pointer flex-col items-center">
+        <div className="flex cursor-pointer flex-col items-center">
           <Upload className="mb-4 h-10 w-10 text-muted-foreground" />
           <p className="text-base font-medium">Drop your spreadsheet here</p>
           <p className="mt-1 text-sm text-muted-foreground">
             .xls, .xlsx, or .csv — everything stays in your browser
           </p>
-        </label>
-        <Button className="mt-6" variant="outline" onClick={() => document.getElementById("file-input")?.click()}>
+        </div>
+        <Button className="mt-6" variant="outline" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
           Choose file
         </Button>
       </div>

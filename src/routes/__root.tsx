@@ -143,10 +143,12 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <meta name="theme-color" content="#0a0a0a" />
       </head>
       <body>
         {children}
         <Scripts />
+        <script dangerouslySetInnerHTML={{ __html: `'serviceWorker'in navigator&&navigator.serviceWorker.register('/sw.js')` }} />
       </body>
     </html>
   );

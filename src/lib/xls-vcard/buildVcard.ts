@@ -53,6 +53,85 @@ function toDate(v: string): string {
   return v;
 }
 
+const PREFIXES = new Set([
+  "mr", "mrs", "ms", "miss", "mx", "dr", "prof", "rev", "hon",
+  "sir", "lady", "lord", "fr", "sr", "br", "pres", "ceo",
+]);
+
+const SUFFIXES = new Set([
+  "jr", "sr", "ii", "iii", "iv", "v",
+  "phd", "md", "dds", "dvm", "rn", "esq", "cpa", "jd", "pe",
+  "mba", "cfa",
+]);
+
+function stripDot(w: string) {
+  return w.endsWith(".") ? w.slice(0, -1) : w;
+}
+
+function cap(w: string) {
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+function parseFullName(name: string): {
+  givenName: string;
+  familyName: string;
+  middleName: string;
+  prefix: string;
+  suffix: string;
+} {
+  const result = { givenName: "", familyName: "", middleName: "", prefix: "", suffix: "" };
+  let s = name.trim();
+  if (!s) return result;
+
+  // "Last, First Middle Suffix" format
+  const commaIdx = s.indexOf(",");
+  if (commaIdx > 0) {
+    result.familyName = s.slice(0, commaIdx).trim();
+    s = s.slice(commaIdx + 1).trim();
+  }
+
+  const parts = s.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return result;
+
+  // Extract prefix from first token
+  let idx = 0;
+  if (PREFIXES.has(stripDot(parts[idx]).toLowerCase())) {
+    result.prefix = cap(stripDot(parts[idx]).toLowerCase());
+    idx++;
+  }
+
+  // Extract suffix from last token if family not yet set
+  let lastIdx = parts.length - 1;
+  if (!result.familyName && lastIdx >= idx) {
+    const lastLower = stripDot(parts[lastIdx]).toLowerCase();
+    if (SUFFIXES.has(lastLower)) {
+      result.suffix = cap(lastLower);
+      lastIdx--;
+    }
+  }
+
+  const remaining = parts.slice(idx, lastIdx + 1);
+  if (remaining.length === 0) return result;
+
+  if (result.familyName) {
+    result.givenName = remaining[0];
+    if (remaining.length > 1) {
+      result.middleName = remaining.slice(1).join(" ");
+    }
+  } else if (remaining.length === 1) {
+    result.givenName = remaining[0];
+  } else if (remaining.length === 2) {
+    result.givenName = remaining[0];
+    result.familyName = remaining[1];
+  } else {
+    result.givenName = remaining[0];
+    result.middleName = remaining.slice(1, -1).join(" ");
+    result.familyName = remaining[remaining.length - 1];
+  }
+
+  return result;
+}
+
 export function buildVCard(
   row: Record<string, CellValue>,
   cfg: MappingConfig,
@@ -60,23 +139,24 @@ export function buildVCard(
 ): VCard {
   const card = new VCard();
 
-  let given = cfg.firstNameAssembly.length > 0 ? assemble(row, cfg.firstNameAssembly) : cell(row, cfg.givenName);
-  let family = cfg.lastNameAssembly.length > 0 ? assemble(row, cfg.lastNameAssembly) : cell(row, cfg.familyName);
-  const middle = cell(row, cfg.additionalNames);
-  const pre = cell(row, cfg.honorificPrefix);
-  const suf = cell(row, cfg.honorificSuffix);
+  let given =
+    cfg.firstNameAssembly.length > 0 ? assemble(row, cfg.firstNameAssembly) : cell(row, cfg.givenName);
+  let family =
+    cfg.lastNameAssembly.length > 0 ? assemble(row, cfg.lastNameAssembly) : cell(row, cfg.familyName);
+  let middle = cell(row, cfg.additionalNames);
+  let pre = cell(row, cfg.honorificPrefix);
+  let suf = cell(row, cfg.honorificSuffix);
 
   // Auto-split fullName column when individual fields are empty
   if (!given && !family && cfg.fullName) {
     const full = cell(row, cfg.fullName);
     if (full) {
-      const space = full.indexOf(" ");
-      if (space > 0) {
-        given = full.slice(0, space).trim();
-        family = full.slice(space + 1).trim();
-      } else {
-        given = full;
-      }
+      const parsed = parseFullName(full);
+      given = parsed.givenName;
+      family = parsed.familyName;
+      if (!middle && parsed.middleName) middle = parsed.middleName;
+      if (!pre && parsed.prefix) pre = parsed.prefix;
+      if (!suf && parsed.suffix) suf = parsed.suffix;
     }
   }
 

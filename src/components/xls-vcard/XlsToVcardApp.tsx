@@ -404,8 +404,13 @@ export function XlsToVcardApp() {
             </div>
           </div>
           {step !== "drop" && (
-            <Button variant="ghost" size="sm" onClick={reset}>
-              <X className="h-4 w-4" /> Start over
+            <Button variant="ghost" size="sm" onClick={() => {
+              if (window.confirm("Clear all locally cached data? This cannot be undone.")) {
+                localStorage.clear();
+                reset();
+              }
+            }}>
+              <Trash2 className="h-4 w-4" /> Clear cache
             </Button>
           )}
         </div>
